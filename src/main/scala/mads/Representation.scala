@@ -9,3 +9,7 @@ trait Representation[A]:
   def h6(header: String): A
 
   def paragraph(content: String & A): A
+
+  def argument(a: Any): Either[String, A]
+
+  def text(text: String): A
