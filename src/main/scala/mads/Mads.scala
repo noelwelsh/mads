@@ -1,10 +1,11 @@
 package mads
 
+import cats.Semigroup
 import cats.data.Chain
 import cats.implicits._
 import cats.instances.string
 
-final case class Mads[A](repr: Representation[A]) {
+final case class Mads[A: Semigroup](repr: Representation[A]) {
   import Mads._
 
   val lineEnd: Parser[Unit] = Parser.string("\r\n").orElse(Parser.string("\n")).void
@@ -13,24 +14,26 @@ final case class Mads[A](repr: Representation[A]) {
 
   val hash = Parser.char('#')
 
-  val heading: Parser[Heading[A]] = {
-    val level =
-      Parser.stringsIn(List("#", "##", "###", "####", "#####", "######"))
-        .map(string =>
-          string match {
-            case "#" => HeadingLevel.H1
-            case "##" => HeadingLevel.H2
-            case "###" => HeadingLevel.H3
-            case "####" => HeadingLevel.H4
-            case "#####" => HeadingLevel.H5
-            case "######" => HeadingLevel.H6
-          }
-        )
-    val content =
-      whiteSpace *> Parser.charsUntilTerminator("\n", "\r\n").map(repr.text).resumable
+  val heading: Parser[A] = {
+    val level = Parser.stringIn(List("#", "##", "###", "####", "#####", "######"))
 
-    (level ~ content).map((l, c) => Heading(l, c))
+    val content =
+      whiteSpace *> Parser.charsUntilTerminator("\n", "\r\n").map(repr.text).resumable(repr.text)
+
+    (level ~ content).map((l, c) =>
+          l match {
+            case "#" => repr.h1(c)
+            case "##" => repr.h2(c)
+            case "###" => repr.h3(c)
+            case "####" => repr.h4(c)
+            case "#####" => repr.h5(c)
+            case "######" => repr.h6(c)
+          }
+    )
   }
+
+  def parse(parts: Array[String], args: Array[Any]): Parser.Result[A] =
+    heading.parse(parts(0))
 }
 object Mads {
   enum Element {
@@ -39,7 +42,7 @@ object Mads {
     case Eof
   }
 
-  final case class Heading[A](level: HeadingLevel, content: Chain[A])
+  final case class Heading[A](level: HeadingLevel, content: A)
   enum HeadingLevel {
     case H1
     case H2

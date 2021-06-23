@@ -10,6 +10,7 @@ lazy val root = project
 
     libraryDependencies ++= Seq(
       "org.typelevel" %% "cats-core" % "2.6.1",
+      "org.scalameta" %% "munit" % "0.7.26" % Test,
       "com.novocode" % "junit-interface" % "0.11" % Test
     )
   )
