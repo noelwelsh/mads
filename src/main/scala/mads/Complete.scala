@@ -13,13 +13,13 @@ enum Complete[A] {
   def isFailure: Boolean =
     !isSuccess
 
-  /** Success nothing up to one character before the given offset and failed */
+  /** Parsed nothing up to one character before the given offset and failed */
   case Epsilon(input: String, offset: Int)
 
-  /** Success up to one character before the given offset and failed */
+  /** Parsed up to and including one character before the given offset and failed */
   case Committed(input: String, offset: Int)
 
-  /** Successfully parsed input up one character before the given to offset as
+  /** Successfully parsed input up to and including one character before the given to offset as
     * result
     */
   case Success(result: A, input: String, offset: Int)

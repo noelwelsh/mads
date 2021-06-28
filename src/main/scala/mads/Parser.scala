@@ -96,16 +96,16 @@ enum Parser[A] {
             else offset
 
           val end = loop(offset)
-          if offset == end then Epsilon(input, end)
-          else Success(input.substring(offset, end), input, end)
+          Success(input.substring(offset, end), input, end)
 
         case CharactersUntilTerminator(ts) =>
           var idx = -1
           var nextOffset = -1
           ts.foreach { t =>
             val i = input.indexOf(t, offset)
-            if (i != -1) && ((idx == -1) || (i < idx)) then idx = i
-            nextOffset = idx + t.size
+            if (i != -1) && ((idx == -1) || (i < idx)) then
+              idx = i
+              nextOffset = idx + t.size
             ()
           }
           if idx == -1 then Committed(input, input.size)
@@ -166,7 +166,7 @@ enum Parser[A] {
               matched = str
               length = str.size
           )
-          if found then Success(matched, input, offset)
+          if found then Success(matched, input, offset+length)
           else Epsilon(input, offset)
 
         case Void(p) =>
@@ -204,13 +204,16 @@ object Parser {
   def charWhere(predicate: Char => Boolean): Parser[Char] =
     Parser.CharacterWhere(predicate)
 
+  /**
+   * Parses zero or more character until the predicate succeeds.
+   */
   def charsWhile(predicate: Char => Boolean): Parser[String] =
     Parser.CharactersWhile(predicate)
 
   def charsUntil(predicate: Char => Boolean): Parser[String] =
     charsWhile(ch => !predicate(ch))
 
-  /** Match until the first example of one of the terminators */
+  /** Parse until the first example of one of the terminators */
   def charsUntilTerminator(terminators: String*): Parser[String] =
     CharactersUntilTerminator(terminators)
 

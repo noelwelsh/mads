@@ -14,16 +14,21 @@ class ParserSuite extends FunSuite {
   }
 
   test("Parser.charsWhile") {
-    assertEquals(Parser.charsWhile(_.isDigit).parseOrExn("123abc"), "123")
-    assert(Parser.charsWhile(_.isDigit).parse("b").isFailure)
+    assertEquals(Parser.charsWhile(_.isDigit).parse("123abc"), Complete.Success("123", "123abc", 3))
+    assertEquals(Parser.charsWhile(_.isDigit).parse("abc"), Complete.Success("", "abc", 0))
+  }
+
+  test("Parser.charsUntilTerminator") {
+    assertEquals(Parser.charsUntilTerminator("abc").parse("123abc"), Complete.Success("123", "123abc", 6))
+    assertEquals(Parser.charsUntilTerminator("a", "bc").parse("123abc"), Complete.Success("123", "123abc", 4))
   }
 
   test("Parser.stringIn") {
     val p = Parser.stringIn(List("#", "##", "###"))
-    assertEquals(p.parseOrExn("#"), "#")
-    assertEquals(p.parseOrExn("##"), "##")
-    assertEquals(p.parseOrExn("###"), "###")
-    assertEquals(p.parseOrExn("####"), "###")
+    assertEquals(p.parse("#"), Complete.Success("#", "#", 1))
+    assertEquals(p.parse("##"), Complete.Success("##", "##", 2))
+    assertEquals(p.parse("###"), Complete.Success("###", "###", 3))
+    assertEquals(p.parse("####"), Complete.Success("###", "####", 3))
     assert(p.parse("abc").isFailure)
   }
 }

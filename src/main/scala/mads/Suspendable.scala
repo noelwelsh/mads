@@ -62,9 +62,18 @@ enum Suspendable[S, A] {
     }
   }
 
-  def parse(input: String, offset: Int = 0): Resumable[S, A] = {
+  def parse(input: String, offset: Int = 0): Resumable[S, A] =
     loop(input, offset, (a, i, o) => Resumable.success(a, i, o))
-  }
+
+  /**
+   * Parse the input string without suspending or failing in other ways or throw
+   * an exception. Mainly useful for tests or quick hacks.
+   */
+  def parseOrExn(input: String): A =
+    this.parse(input) match {
+      case Resumable.Finished(Complete.Success(a, _, _)) => a
+      case other => throw new Exception(s"Parsing failed with $other")
+    }
 
   case Product[S, A, B](left: Suspendable[S, A], right: Suspendable[S, B])
       extends Suspendable[S, (A, B)]
