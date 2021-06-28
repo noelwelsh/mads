@@ -10,6 +10,6 @@ trait Representation[A]:
 
   def paragraph(content: A): A
 
-  def argument(a: Any): Either[String, A]
+  def argument(a: Any): A
 
   def text(text: String): A

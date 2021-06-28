@@ -17,4 +17,13 @@ class ParserSuite extends FunSuite {
     assertEquals(Parser.charsWhile(_.isDigit).parseOrExn("123abc"), "123")
     assert(Parser.charsWhile(_.isDigit).parse("b").isFailure)
   }
+
+  test("Parser.stringIn") {
+    val p = Parser.stringIn(List("#", "##", "###"))
+    assertEquals(p.parseOrExn("#"), "#")
+    assertEquals(p.parseOrExn("##"), "##")
+    assertEquals(p.parseOrExn("###"), "###")
+    assertEquals(p.parseOrExn("####"), "###")
+    assert(p.parse("abc").isFailure)
+  }
 }

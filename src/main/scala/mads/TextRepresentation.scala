@@ -12,7 +12,7 @@ object TextRepresentation extends Representation[String] {
 
   def paragraph(content: String): String = content
 
-  def argument(a: Any): Either[String, String] = a.toString.asRight
+  def argument(a: Any): String = a.toString
 
   def text(text: String): String = text
 }
