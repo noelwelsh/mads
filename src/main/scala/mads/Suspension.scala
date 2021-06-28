@@ -44,9 +44,7 @@ final case class Suspension[S, A](
           case Complete.Epsilon(i, o)   => Resumable.epsilon(i, o)
           case Complete.Committed(i, o) => Resumable.committed(i, o)
           case Complete.Success(s, i, o) =>
-            Suspended(
-              this.copy(partialResult = semigroup.combine(partialResult, s))
-            )
+            continuation(semigroup.combine(partialResult, s), i, o)
         }
     }
 }

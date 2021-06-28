@@ -45,7 +45,7 @@ enum Suspendable[S, A] {
         parser.parse(input, offset) match {
           case Success(a, i, o) => continuation(a, i, o)
           case Committed(i, o) =>
-            if offset == i.size then
+            if o == i.size then
               val suspension =
                 Suspension(this, lift(i), semigroup, continuation)
               Resumable.Suspended(suspension)
@@ -64,6 +64,27 @@ enum Suspendable[S, A] {
 
   def parse(input: String, offset: Int = 0): Resumable[S, A] =
     loop(input, offset, (a, i, o) => Resumable.success(a, i, o))
+
+  def parseToCompletion(input: IterableOnce[String], offset: Int = 0): Complete[A] = {
+    import Resumable.{Suspended, Finished}
+    import Complete.{Success, Committed, Epsilon}
+
+    def loop(previousInput: String, input: Iterator[String], result: Resumable[S, A]): Complete[A] =
+      result match {
+        case Suspended(s) =>
+          if input.hasNext then
+            val nextInput = input.next()
+            loop(nextInput, input, s.parse(nextInput))
+          else Committed(previousInput, previousInput.size)
+        case Finished(c) => c
+      }
+
+    val it = input.iterator
+    if it.hasNext then
+      val nextInput = it.next()
+      loop(nextInput, it, this.parse(nextInput))
+    else throw IllegalStateException("Cannot parse from no input.")
+  }
 
   /**
    * Parse the input string without suspending or failing in other ways or throw

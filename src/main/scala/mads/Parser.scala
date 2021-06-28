@@ -92,7 +92,8 @@ enum Parser[A] {
 
         case CharactersWhile(p) =>
           def loop(offset: Int): Int =
-            if p(input(offset)) then loop(offset + 1)
+            if offset == input.size then offset
+            else if p(input(offset)) then loop(offset + 1)
             else offset
 
           val end = loop(offset)

@@ -13,4 +13,12 @@ class MadsSuite extends FunSuite {
     )
   }
 
+  test("h1 with arg") {
+    val input = Array("# ", "\n")
+    val args: Array[Any] = Array("Heading 1")
+
+    val result = mads.parse(input, args)
+
+    assertEquals(result, Complete.Success("<h1>Heading 1</h1>", "\n", 1))
+  }
 }

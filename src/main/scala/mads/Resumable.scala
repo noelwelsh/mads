@@ -11,6 +11,15 @@ import cats.Semigroup
 enum Resumable[S, A] {
   import Resumable.*
 
+  def isFinished: Boolean =
+    this match {
+      case Finished(_) => true
+      case _ => false
+    }
+
+  def isSuspension: Boolean =
+    !isFinished
+
   def map[B](f: A => B): Resumable[S, B] =
     this match {
       case Suspended(s) => Suspended(s.map(f))

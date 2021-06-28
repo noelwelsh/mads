@@ -15,12 +15,14 @@ class ParserSuite extends FunSuite {
 
   test("Parser.charsWhile") {
     assertEquals(Parser.charsWhile(_.isDigit).parse("123abc"), Complete.Success("123", "123abc", 3))
+    assertEquals(Parser.charsWhile(_.isDigit).parse("123"), Complete.Success("123", "123", 3))
     assertEquals(Parser.charsWhile(_.isDigit).parse("abc"), Complete.Success("", "abc", 0))
   }
 
   test("Parser.charsUntilTerminator") {
     assertEquals(Parser.charsUntilTerminator("abc").parse("123abc"), Complete.Success("123", "123abc", 6))
     assertEquals(Parser.charsUntilTerminator("a", "bc").parse("123abc"), Complete.Success("123", "123abc", 4))
+    assertEquals(Parser.charsUntilTerminator("abc").parse("123"), Complete.Committed("123", 3))
   }
 
   test("Parser.stringIn") {
