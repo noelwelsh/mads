@@ -50,7 +50,12 @@ enum Suspendable[S, A] {
                 Suspension(this, lift(i), semigroup, continuation)
               Resumable.Suspended(suspension)
             else Resumable.committed(i, o)
-          case Epsilon(i, o) => Resumable.epsilon(i, o)
+          case Epsilon(i, o) =>
+            if o == i.size then
+              val suspension =
+                Suspension(this, lift(""), semigroup, continuation)
+              Resumable.Suspended(suspension)
+            else Resumable.epsilon(i, o)
         }
 
       case Unsuspendable(parser) =>
