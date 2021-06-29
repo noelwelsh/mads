@@ -48,31 +48,16 @@ final case class Mads[A: Semigroup](repr: Representation[A]) {
 
   val parser: Suspendable[A, A] = heading.orElse(paragraph)
 
-  def parse(parts: Array[String], args: Array[Any]): Complete[A] = {
+  def parse(parts: Array[String], args: Array[Any]): Option[A] = {
     import Complete.*
     import Resumable.*
 
-    def loop(idx: Int, result: Resumable[A, A]): Complete[A] =
-      result match {
-        case Finished(Success(a1, i, o)) =>
-          if idx >= parts.size then Complete.Success(a1, i, o)
-          else
-            // We successfully parsed part of the file and will attempt to continue parsing. A manual resumption
-            val a2 = repr.argument(args(idx - 1))
-            val i = parts(idx)
-            val result = parser.parse(i).map(r2 => a1.combine(a2).combine(r2))
-            loop(idx + 1, result)
-
-        case Finished(other) => other
-
-        case Suspended(s) =>
-          if idx >= parts.size then
-            Complete.Committed(parts.last, parts.last.size)
-          else
-            val a = repr.argument(args(idx - 1))
-            val i = parts(idx)
-            loop(idx + 1, s.inject(a).parse(i))
-      }
+    def loop(idx: Int, result: Resumable[A, A]): Option[A] =
+      if idx >= parts.size then result.get
+      else
+        val a = repr.argument(args(idx - 1))
+        val input = parts(idx)
+        loop(idx + 1, result.injectAndResumeOrRestart(a, input, parser))
 
     assert(parts.size > 0)
     assert(args.size == parts.size - 1)

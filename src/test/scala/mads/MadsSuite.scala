@@ -9,7 +9,7 @@ class MadsSuite extends FunSuite {
     val input = "# Heading 1\n"
     assertEquals(
       mads.parse(Array(input), Array()),
-      Complete.Success("<h1>Heading 1</h1>", input, input.size)
+      Some("<h1>Heading 1</h1>")
     )
   }
 
@@ -19,6 +19,6 @@ class MadsSuite extends FunSuite {
 
     val result = mads.parse(input, args)
 
-    assertEquals(result, Complete.Success("<h1>Heading 1</h1>", "\n", 1))
+    assertEquals(result, Some("<h1>Heading 1</h1>"))
   }
 }

@@ -1,6 +1,7 @@
 package mads
 
 import cats.Semigroup
+import mads.continuation.*
 
 /** A parser that can be suspended
   *
@@ -52,15 +53,11 @@ enum Suspendable[S, A] {
           case Success(a, i, o) => continuation(a, i, o)
           case Committed(i, o) =>
             if o == i.size then
-              val suspension =
-                Suspension(this, lift(i), semigroup, continuation)
-              Resumable.Suspended(suspension)
+              Resumable.Suspended(this, lift(i), semigroup, Continuation.onSuccess(continuation))
             else Resumable.committed(i, o)
           case Epsilon(i, o) =>
             if o == i.size then
-              val suspension =
-                Suspension(this, lift(""), semigroup, continuation)
-              Resumable.Suspended(suspension)
+              Resumable.Suspended(this, lift(""), semigroup, Continuation.onSuccess(continuation))
             else Resumable.epsilon(i, o)
         }
 
@@ -89,10 +86,10 @@ enum Suspendable[S, A] {
         result: Resumable[S, A]
     ): Complete[A] =
       result match {
-        case Suspended(s) =>
+        case s @ Suspended(_, _, _, _) =>
           if input.hasNext then
             val nextInput = input.next()
-            loop(nextInput, input, s.parse(nextInput))
+            loop(nextInput, input, s.resume(nextInput))
           else Committed(previousInput, previousInput.size)
         case Finished(c) => c
       }
