@@ -16,11 +16,13 @@ enum Complete[A] {
   /** Parsed nothing up to one character before the given offset and failed */
   case Epsilon(input: String, offset: Int)
 
-  /** Parsed up to and including one character before the given offset and failed */
+  /** Parsed up to and including one character before the given offset and
+    * failed
+    */
   case Committed(input: String, offset: Int)
 
-  /** Successfully parsed input up to and including one character before the given to offset as
-    * result
+  /** Successfully parsed input up to and including one character before the
+    * given to offset as result
     */
   case Success(result: A, input: String, offset: Int)
 }

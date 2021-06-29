@@ -14,7 +14,7 @@ enum Resumable[S, A] {
   def isFinished: Boolean =
     this match {
       case Finished(_) => true
-      case _ => false
+      case _           => false
     }
 
   def isSuspension: Boolean =

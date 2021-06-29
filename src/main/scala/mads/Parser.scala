@@ -112,6 +112,19 @@ enum Parser[A] {
           if idx == -1 then Committed(input, input.size)
           else Success(input.substring(offset, idx), input, nextOffset)
 
+        case CharactersUntilTerminatorOrEnd(ts) =>
+          var idx = -1
+          var nextOffset = -1
+          ts.foreach { t =>
+            val i = input.indexOf(t, offset)
+            if (i != -1) && ((idx == -1) || (i < idx)) then
+              idx = i
+              nextOffset = idx + t.size
+            ()
+          }
+          if idx == -1 then Success(input, input, input.size)
+          else Success(input.substring(offset, idx), input, nextOffset)
+
         case Exactly(s) =>
           if input.startsWith(s, offset) then Success(s, input, offset + s.size)
           else Epsilon(input, offset)
@@ -167,7 +180,7 @@ enum Parser[A] {
               matched = str
               length = str.size
           )
-          if found then Success(matched, input, offset+length)
+          if found then Success(matched, input, offset + length)
           else Epsilon(input, offset)
 
         case Void(p) =>
@@ -190,6 +203,8 @@ enum Parser[A] {
   case CharactersWhile(predicate: Char => Boolean) extends Parser[String]
   case CharactersUntilTerminator(terminators: Seq[String])
       extends Parser[String]
+  case CharactersUntilTerminatorOrEnd(terminators: Seq[String])
+      extends Parser[String]
   case Exactly(expected: String) extends Parser[String]
   case Product[A, B](left: Parser[A], right: Parser[B]) extends Parser[(A, B)]
   case Map[A, B](source: Parser[A], f: A => B) extends Parser[B]
@@ -205,9 +220,8 @@ object Parser {
   def charWhere(predicate: Char => Boolean): Parser[Char] =
     Parser.CharacterWhere(predicate)
 
-  /**
-   * Parses zero or more character until the predicate succeeds.
-   */
+  /** Parses zero or more character until the predicate succeeds.
+    */
   def charsWhile(predicate: Char => Boolean): Parser[String] =
     Parser.CharactersWhile(predicate)
 
@@ -217,6 +231,12 @@ object Parser {
   /** Parse until the first example of one of the terminators */
   def charsUntilTerminator(terminators: String*): Parser[String] =
     CharactersUntilTerminator(terminators)
+
+  /** Parse until the first example of one of the terminators or the end of the
+    * input
+    */
+  def charsUntilTerminatorOrEnd(terminators: String*): Parser[String] =
+    CharactersUntilTerminatorOrEnd(terminators)
 
   def oneOf[A](parsers: List[Parser[A]]): Parser[A] =
     OneOf(parsers)

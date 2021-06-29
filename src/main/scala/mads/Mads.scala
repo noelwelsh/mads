@@ -38,7 +38,15 @@ final case class Mads[A: Semigroup](repr: Representation[A]) {
     )
   }
 
-  val parser: Suspendable[A, A] = heading
+  val paragraph: Suspendable[A, A] = {
+    Parser
+      .charsUntilTerminator("\n", "\r\n")
+      .map(repr.text)
+      .suspendable(repr.text)
+      .map(repr.paragraph)
+  }
+
+  val parser: Suspendable[A, A] = heading.orElse(paragraph)
 
   def parse(parts: Array[String], args: Array[Any]): Complete[A] = {
     import Complete.*

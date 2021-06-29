@@ -16,6 +16,9 @@ enum Suspendable[S, A] {
   def ~[B](that: Suspendable[S, B]): Suspendable[S, (A, B)] =
     Product(this, that)
 
+  def orElse(that: Suspendable[S, A]): Suspendable[S, A] =
+    OrElse(this, that)
+
   def map[B](f: A => B): Suspendable[S, B] =
     Map(this, f)
 
@@ -30,6 +33,12 @@ enum Suspendable[S, A] {
     import Complete.{Epsilon, Committed, Success}
 
     this match {
+      case Map(source, f) =>
+        source.loop(input, offset, (a, i, o) => continuation(f(a), i, o))
+
+      case OrElse(left, right) =>
+        ???
+
       case Product(left, right) =>
         left.loop(
           input,
@@ -37,9 +46,6 @@ enum Suspendable[S, A] {
           (a, i, o) =>
             right.loop(i, o, (b, i2, o2) => continuation((a, b), i2, o2))
         )
-
-      case Map(source, f) =>
-        source.loop(input, offset, (a, i, o) => continuation(f(a), i, o))
 
       case Suspend(parser, lift, semigroup) =>
         parser.parse(input, offset) match {
@@ -70,11 +76,18 @@ enum Suspendable[S, A] {
   def parse(input: String, offset: Int = 0): Resumable[S, A] =
     loop(input, offset, (a, i, o) => Resumable.success(a, i, o))
 
-  def parseToCompletion(input: IterableOnce[String], offset: Int = 0): Complete[A] = {
+  def parseToCompletion(
+      input: IterableOnce[String],
+      offset: Int = 0
+  ): Complete[A] = {
     import Resumable.{Suspended, Finished}
     import Complete.{Success, Committed, Epsilon}
 
-    def loop(previousInput: String, input: Iterator[String], result: Resumable[S, A]): Complete[A] =
+    def loop(
+        previousInput: String,
+        input: Iterator[String],
+        result: Resumable[S, A]
+    ): Complete[A] =
       result match {
         case Suspended(s) =>
           if input.hasNext then
@@ -91,16 +104,17 @@ enum Suspendable[S, A] {
     else throw IllegalStateException("Cannot parse from no input.")
   }
 
-  /**
-   * Parse the input string without suspending or failing in other ways or throw
-   * an exception. Mainly useful for tests or quick hacks.
-   */
+  /** Parse the input string without suspending or failing in other ways or
+    * throw an exception. Mainly useful for tests or quick hacks.
+    */
   def parseOrExn(input: String): A =
     this.parse(input) match {
       case Resumable.Finished(Complete.Success(a, _, _)) => a
       case other => throw new Exception(s"Parsing failed with $other")
     }
 
+  case OrElse[S, A](left: Suspendable[S, A], right: Suspendable[S, A])
+      extends Suspendable[S, A]
   case Product[S, A, B](left: Suspendable[S, A], right: Suspendable[S, B])
       extends Suspendable[S, (A, B)]
   case Map[S, A, B](source: Suspendable[S, A], f: A => B)
