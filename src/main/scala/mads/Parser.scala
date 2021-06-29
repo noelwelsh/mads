@@ -122,7 +122,7 @@ enum Parser[A] {
               nextOffset = idx + t.size
             ()
           }
-          if idx == -1 then Success(input, input, input.size)
+          if idx == -1 then Success(input.substring(offset), input, input.size)
           else Success(input.substring(offset, idx), input, nextOffset)
 
         case Exactly(s) =>
