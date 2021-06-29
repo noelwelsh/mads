@@ -82,7 +82,7 @@ enum Resumable[S, A] {
       parser: Suspendable[S, S],
       partialResult: S,
       semigroup: Semigroup[S],
-      continuation: Continuation[S, A]
+      continuation: Continuation[S, S, A]
   ) extends Resumable[S, A]
 
   /** Parser has finished with its' input */

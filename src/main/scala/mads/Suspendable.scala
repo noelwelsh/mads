@@ -53,11 +53,21 @@ enum Suspendable[S, A] {
           case Success(a, i, o) => continuation(a, i, o)
           case Committed(i, o) =>
             if o == i.size then
-              Resumable.Suspended(this, lift(i), semigroup, Continuation.onSuccess(continuation))
+              Resumable.Suspended(
+                this,
+                lift(i),
+                semigroup,
+                Continuation.onSuccess(continuation)
+              )
             else Resumable.committed(i, o)
           case Epsilon(i, o) =>
             if o == i.size then
-              Resumable.Suspended(this, lift(""), semigroup, Continuation.onSuccess(continuation))
+              Resumable.Suspended(
+                this,
+                lift(""),
+                semigroup,
+                Continuation.onSuccess(continuation)
+              )
             else Resumable.epsilon(i, o)
         }
 
