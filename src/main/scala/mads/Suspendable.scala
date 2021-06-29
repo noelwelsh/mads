@@ -44,7 +44,16 @@ enum Suspendable[S, A] {
         )
 
       case OrElse(left, right) =>
-        ???
+        left.loop(
+          input,
+          offset,
+          Continuation(c =>
+            c match {
+              case Epsilon(i, o) => right.loop(input, offset, continuation)
+              case other         => continuation(other)
+            }
+          )
+        )
 
       case Product(left, right) =>
         left.loop(
