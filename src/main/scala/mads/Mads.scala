@@ -22,7 +22,7 @@ final case class Mads[A: Semigroup](repr: Representation[A]) {
 
     val content: Suspendable[A, A] =
       whiteSpace *> Parser
-        .charsUntilTerminator("\n", "\r\n")
+        .charsUntilTerminatorOrEnd("\n", "\r\n")
         .map(repr.text)
         .suspendable(repr.text)
 
@@ -40,7 +40,7 @@ final case class Mads[A: Semigroup](repr: Representation[A]) {
 
   val paragraph: Suspendable[A, A] = {
     Parser
-      .charsUntilTerminator("\n", "\r\n")
+      .charsUntilTerminatorOrEnd("\n", "\r\n")
       .map(repr.text)
       .suspendable(repr.text)
       .map(repr.paragraph)
