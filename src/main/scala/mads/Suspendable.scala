@@ -29,13 +29,19 @@ enum Suspendable[S, A] {
   def loop[B](
       input: String,
       offset: Int,
-      continuation: (A, String, Int) => Resumable[S, B]
+      continuation: Continuation[S, A, B]
   ): Resumable[S, B] = {
     import Complete.{Epsilon, Committed, Success}
 
     this match {
       case Map(source, f) =>
-        source.loop(input, offset, (a, i, o) => continuation(f(a), i, o))
+        source.loop(
+          input,
+          offset,
+          Continuation.onSuccess((a, i, o) =>
+            continuation(Complete.Success(f(a), i, o))
+          )
+        )
 
       case OrElse(left, right) =>
         ???
@@ -44,20 +50,27 @@ enum Suspendable[S, A] {
         left.loop(
           input,
           offset,
-          (a, i, o) =>
-            right.loop(i, o, (b, i2, o2) => continuation((a, b), i2, o2))
+          Continuation.onSuccess((a, i, o) =>
+            right.loop(
+              i,
+              o,
+              Continuation.onSuccess((b, i2, o2) =>
+                continuation(Complete.Success((a, b), i2, o2))
+              )
+            )
+          )
         )
 
       case Suspend(parser, lift, semigroup) =>
         parser.parse(input, offset) match {
-          case Success(a, i, o) => continuation(a, i, o)
+          case Success(a, i, o) => continuation(Complete.Success(a, i, o))
           case Committed(i, o) =>
             if o == i.size then
               Resumable.Suspended(
                 this,
                 lift(i),
                 semigroup,
-                Continuation.onSuccess(continuation)
+                continuation
               )
             else Resumable.committed(i, o)
           case Epsilon(i, o) =>
@@ -66,14 +79,14 @@ enum Suspendable[S, A] {
                 this,
                 lift(""),
                 semigroup,
-                Continuation.onSuccess(continuation)
+                continuation
               )
             else Resumable.epsilon(i, o)
         }
 
       case Unsuspendable(parser) =>
         parser.parse(input, offset) match {
-          case Success(a, i, o) => continuation(a, i, o)
+          case Success(a, i, o) => continuation(Complete.Success(a, i, o))
           case Committed(i, o)  => Resumable.committed(i, o)
           case Epsilon(i, o)    => Resumable.epsilon(i, o)
         }
@@ -81,7 +94,11 @@ enum Suspendable[S, A] {
   }
 
   def parse(input: String, offset: Int = 0): Resumable[S, A] =
-    loop(input, offset, (a, i, o) => Resumable.success(a, i, o))
+    loop(
+      input,
+      offset,
+      Continuation.onSuccess((a, i, o) => Resumable.success(a, i, o))
+    )
 
   def parseToCompletion(
       input: IterableOnce[String],
