@@ -3,6 +3,8 @@ package mads
 import munit.FunSuite
 
 class ParserSuite extends FunSuite {
+  import Parser.Result
+
   test("Parser.char") {
     assertEquals(Parser.char('a').parseOrExn("a"), 'a')
     assert(Parser.char('a').parse("b").isFailure)
@@ -16,66 +18,66 @@ class ParserSuite extends FunSuite {
   test("Parser.charsWhile") {
     assertEquals(
       Parser.charsWhile(_.isDigit).parse("123abc"),
-      Complete.Success("123", "123abc", 3)
+      Result.Success("123", "123abc", 0, 3)
     )
     assertEquals(
       Parser.charsWhile(_.isDigit).parse("123"),
-      Complete.Success("123", "123", 3)
+      Result.Continue("123", "123", 0)
     )
     assertEquals(
       Parser.charsWhile(_.isDigit).parse("abc"),
-      Complete.Success("", "abc", 0)
+      Result.Success("", "abc", 0, 0)
     )
   }
 
   test("Parser.charsUntilTerminator") {
     assertEquals(
       Parser.charsUntilTerminator("abc").parse("123abc"),
-      Complete.Success("123", "123abc", 6)
+      Result.Success("123", "123abc", 0, 6)
     )
     assertEquals(
       Parser.charsUntilTerminator("a", "bc").parse("123abc"),
-      Complete.Success("123", "123abc", 4)
+      Result.Success("123", "123abc", 0, 4)
     )
     assertEquals(
       Parser.charsUntilTerminator("a", "b").parse("123b"),
-      Complete.Success("123", "123b", 4)
+      Result.Success("123", "123b", 0, 4)
     )
     assertEquals(
       Parser.charsUntilTerminator("abc").parse("123"),
-      Complete.Committed("123", 3)
+      Result.Committed("123", 0, 3)
     )
   }
 
   test("Parser.charsUntilTerminatorOrEnd") {
     assertEquals(
       Parser.charsUntilTerminatorOrEnd("\n").parse("123abc"),
-      Complete.Success("123abc", "123abc", 6)
+      Result.Continue("123abc", "123abc", 0)
     )
     assertEquals(
       Parser.charsUntilTerminatorOrEnd("\n").parse("123abc\n"),
-      Complete.Success("123abc", "123abc\n", 7)
+      Result.Success("123abc", "123abc\n", 0, 7)
     )
     assertEquals(
       Parser.charsUntilTerminatorOrEnd(">", "<").parse("123<"),
-      Complete.Success("123", "123<", 4)
+      Result.Success("123", "123<", 0, 4)
     )
     assertEquals(
       Parser.charsUntilTerminatorOrEnd(">", "<").parse("123>"),
-      Complete.Success("123", "123>", 4)
+      Result.Success("123", "123>", 0, 4)
     )
     assertEquals(
       Parser.charsUntilTerminatorOrEnd(">", "<").parse("123"),
-      Complete.Success("123", "123", 3)
+      Result.Continue("123", "123", 0)
     )
   }
 
   test("Parser.stringIn") {
     val p = Parser.stringIn(List("#", "##", "###"))
-    assertEquals(p.parse("#"), Complete.Success("#", "#", 1))
-    assertEquals(p.parse("##"), Complete.Success("##", "##", 2))
-    assertEquals(p.parse("###"), Complete.Success("###", "###", 3))
-    assertEquals(p.parse("####"), Complete.Success("###", "####", 3))
+    assertEquals(p.parse("#"), Result.Success("#", "#", 0, 1))
+    assertEquals(p.parse("##"), Result.Success("##", "##", 0, 2))
+    assertEquals(p.parse("###"), Result.Success("###", "###", 0, 3))
+    assertEquals(p.parse("####"), Result.Success("###", "####", 0, 3))
     assert(p.parse("abc").isFailure)
   }
 }
