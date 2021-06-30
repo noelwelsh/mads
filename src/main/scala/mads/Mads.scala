@@ -21,10 +21,10 @@ final case class Mads[A: Semigroup](repr: Representation[A]) {
       Parser.stringIn(List("#", "##", "###", "####", "#####", "######"))
 
     val content: Suspendable[A, A] =
-      whiteSpace *> Parser
-        .charsUntilTerminator("\n", "\r\n")
+      whiteSpace.suspendableWith(_ => ()) *> Parser
+        .charsUntilTerminatorOrEnd("\n", "\r\n")
         .map(repr.text)
-        .suspendable(repr.text)
+        .suspendableWith(repr.text)
 
     (level ~ content).map((l, c) =>
       l match {
@@ -40,17 +40,17 @@ final case class Mads[A: Semigroup](repr: Representation[A]) {
 
   val paragraph: Suspendable[A, A] = {
     Parser
-      .charsUntilTerminator("\n", "\r\n")
+      .charsUntilTerminatorOrEnd("\n", "\r\n")
       .map(repr.text)
-      .suspendable(repr.text)
+      .suspendableWith(repr.text)
       .map(repr.paragraph)
   }
 
   val parser: Suspendable[A, A] = heading.orElse(paragraph)
 
-  def parse(parts: Array[String], args: Array[Any]): Option[A] = {
-    def loop(idx: Int, result: Resumable[A, A]): Option[A] =
-      if idx >= parts.size then result.get
+  def parse(parts: Array[String], args: Array[Any]): Resumable[A, A] = {
+    def loop(idx: Int, result: Resumable[A, A]): Resumable[A, A] =
+      if idx >= parts.size then result
       else
         val a = repr.argument(args(idx - 1))
         val input = parts(idx)

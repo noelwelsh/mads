@@ -66,7 +66,7 @@ enum Parser[A] {
   ): Suspendable[A, A] =
     Suspendable.Suspend(this, str => ev(str), semigroup)
 
-  def suspendable(f: String => A)(using
+  def suspendableWith(f: String => A)(using
       semigroup: Semigroup[A]
   ): Suspendable[A, A] =
     Suspendable.Suspend(this, f, semigroup)
@@ -120,7 +120,7 @@ enum Parser[A] {
               nextOffset = idx + t.size
             ()
           }
-          if idx == -1 then Success(input.substring(offset), input, offset, input.size)
+          if idx == -1 then Continue(input.substring(offset), input, offset)
           else Success(input.substring(offset, idx), input, offset, nextOffset)
 
         case Exactly(s) =>
@@ -129,8 +129,8 @@ enum Parser[A] {
 
         case Map(s, f) =>
           s.parse(input, offset) match {
-            case e: Epsilon[A] => e
-            case c: Committed[A] => c
+            case Epsilon(i, s) => Epsilon(i, s)
+            case Committed(i, s, o) => Committed(i, s, o)
             case Continue(a, i, s) => Continue(f(a), i, s)
             case Success(a, i, s, o) => Success(f(a), i, s, o)
           }
@@ -138,9 +138,9 @@ enum Parser[A] {
         case OrElse(l, r) =>
           l.parse(input, offset) match {
             case Epsilon(i, s)    => r.parse(i, s)
-            case c: Committed[A] => c
-            case c: Continue[A] => c
-            case s: Success[A] => s
+            case Committed(i, s, o) => Committed(i, s, o)
+            case Continue(a, i, s) => Continue(a, i, s)
+            case Success(a, i, s, o) => Success(a, i, s, o)
           }
 
         case OneOf(parsers) =>
@@ -149,10 +149,10 @@ enum Parser[A] {
               case Nil => Epsilon(input, offset)
               case p :: ps =>
                 p.parse(input, offset) match {
-                  case e: Epsilon[A]   => loop(ps)
-                  case c: Committed[A] => c
-                  case c: Continue[A]  => c
-                  case s: Success[A]   => s
+                  case Epsilon(_, _)   => loop(ps)
+                  case Committed(i, s, o) => Committed(i, s, o)
+                  case Continue(a, i, s) => Continue(a, i, s)
+                  case Success(a, i, s, o) => Success(a, i, s, o)
                 }
             }
 
@@ -160,19 +160,19 @@ enum Parser[A] {
 
         case Product(l, r) =>
           l.parse(input, offset) match {
-            case e: Epsilon[A]   => e
-            case c: Committed[A] => c
+            case Epsilon(i, s) => Epsilon(i, s)
+            case Committed(i, s, o) => Committed(i, s, o)
             case Continue(a, i, s) =>
               r.parse(i, i.size) match {
-                case e: Epsilon[A]   => e
-                case c: Committed[A] => c
+                case Epsilon(i, s) => Epsilon(i, s)
+                case Committed(i, s, o) => Committed(i, s, o)
                 case Continue(b, i, _) => Continue((a, b), i, s)
                 case Success(b, i, _, o) => Success((a, b), i, s, o)
               }
             case Success(a, i, s, o) =>
               r.parse(i, o) match {
-                case e: Epsilon[A]   => e
-                case c: Committed[A] => c
+                case Epsilon(i, s) => Epsilon(i, s)
+                case Committed(i, s, o) => Committed(i, s, o)
                 case Continue(b, i, _) => Continue((a, b), i, s)
                 case Success(b, i, _, o) => Success((a, b), i, s, o)
               }
@@ -194,8 +194,8 @@ enum Parser[A] {
 
         case Void(p) =>
           p.parse(input, offset) match {
-            case e: Epsilon[A]   => e
-            case c: Committed[A] => c
+            case Epsilon(i, s) => Epsilon(i, s)
+            case Committed(i, s, o) => Committed(i, s, o)
             case Continue(a, i, s) => Continue((), i, s)
             case Success(a, i, s, o) => Success((), i, s, o)
           }
