@@ -11,11 +11,12 @@ import mads.continuation.*
   */
 enum Resumable[S, A] {
   import Resumable.*
+  import Parser.Result.{Epsilon, Committed, Continue, Success}
 
   def isFinished: Boolean =
     this match {
       case Finished(_) => true
-      case _           => false
+      case s: Suspended[S, A] => false
     }
 
   def isSuspension: Boolean =
@@ -23,18 +24,20 @@ enum Resumable[S, A] {
 
   def get: Option[A] =
     this match {
-      case Finished(Complete.Success(a, _, _)) => Some(a)
-      case _                                   => None
+      case Finished(Success(a, _, _, _)) => Some(a)
+      case Finished(Continue(a, _, _))   => Some(a)
+      case _                             => None
     }
 
   def map[B](f: A => B): Resumable[S, B] =
     this match {
       case Suspended(p, s, semi, c) => Suspended(p, s, semi, c.map(f))
-      case Finished(c) =>
-        c match {
-          case Complete.Epsilon(i, o)    => epsilon(i, o)
-          case Complete.Committed(i, o)  => committed(i, o)
-          case Complete.Success(a, i, o) => success(f(a), i, o)
+      case Finished(r) =>
+        r match {
+          case Epsilon(i, s)    => epsilon(i, s)
+          case Committed(i, s, o)  => committed(i, s, o)
+          case Continue(a, i, s) => continue(f(a), i, s)
+          case Success(a, i, s, o) => success(f(a), i, s, o)
         }
     }
 
@@ -42,27 +45,27 @@ enum Resumable[S, A] {
     this match {
       case Suspended(p, s, semi, c) =>
         Suspended(p, semi.combine(s, result), semi, c)
-      case Finished(c) => Finished(c)
+      case Finished(r) => Finished(r)
     }
 
   /** Resume parsing with the input if this is suspended. */
   def resume(input: String): Resumable[S, A] =
     this match {
-      case Suspended(p, s, semi, cont) =>
+      case Suspended(p, r, semi, cont) =>
         p.parse(input, 0) match {
-          case Suspended(p2, s2, semi2, c2) =>
-            Suspended(p2, semi.combine(s, s2), semi, cont)
+          case Suspended(p2, r2, semi2, c2) =>
+            Suspended(p2, semi.combine(r, r2), semi, cont)
 
-          case Finished(c) =>
-            c match {
-              case Complete.Success(s2, i, o) =>
-                cont(Complete.Success(semi.combine(s, s2), i, o))
+          case Finished(result) =>
+            result match {
+              case Success(r2, i, s, o) =>
+                cont(Success(semi.combine(r, r2), i, s, o))
 
               case other => cont(other)
             }
         }
 
-      case Finished(c) => Finished(c)
+      case Finished(r) => Finished(r)
     }
 
   def injectAndResumeOrRestart(
@@ -86,21 +89,23 @@ enum Resumable[S, A] {
   ) extends Resumable[S, A]
 
   /** Parser has finished with its' input */
-  case Finished(complete: Complete[A])
+  case Finished(result: Parser.Result[A])
 }
 object Resumable {
-  def epsilon[S, A](input: String, offset: Int): Resumable[S, A] =
-    Finished(Complete.Epsilon(input, offset))
+  import Parser.Result.{Epsilon, Committed, Continue, Success}
 
-  def committed[S, A](input: String, offset: Int): Resumable[S, A] =
-    Finished(Complete.Committed(input, offset))
+  def epsilon[S, A](input: String, start: Int): Resumable[S, A] =
+    Finished(Epsilon(input, start))
 
-  def success[S, A](result: A, input: String, offset: Int): Resumable[S, A] =
-    Finished(Complete.Success(result, input, offset))
+  def committed[S, A](input: String, start: Int, offset: Int): Resumable[S, A] =
+    Finished(Committed(input, start, offset))
 
-  def complete[S, A](complete: Complete[A]): Resumable[S, A] =
-    lift(complete)
+  def continue[S, A](result: A, input: String, start: Int): Resumable[S, A] =
+    Finished(Continue(result, input, start))
 
-  def lift[S, A](complete: Complete[A]): Resumable[S, A] =
-    Finished(complete)
+  def success[S, A](result: A, input: String, start: Int, offset: Int): Resumable[S, A] =
+    Finished(Success(result, input, start, offset))
+
+  def lift[S, A](result: Parser.Result[A]): Resumable[S, A] =
+    Finished(result)
 }

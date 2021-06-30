@@ -31,7 +31,7 @@ enum Suspendable[S, A] {
       offset: Int,
       continuation: (A, String, Int) => Resumable[S, B]
   ): Resumable[S, B] = {
-    import Complete.{Epsilon, Committed, Success}
+    import Parser.Result.{Epsilon, Committed, Continue, Success}
 
     this match {
       case Map(source, f) =>
@@ -50,7 +50,7 @@ enum Suspendable[S, A] {
 
       case Suspend(parser, lift, semigroup) =>
         parser.parse(input, offset) match {
-          case Success(a, i, o) => continuation(a, i, o)
+          case Success(a, i, s, o) => continuation(a, i, o)
           case Committed(i, o) =>
             if o == i.size then
               Resumable.Suspended(this, lift(i), semigroup, Continuation.onSuccess(continuation))

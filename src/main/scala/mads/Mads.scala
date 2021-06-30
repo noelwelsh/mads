@@ -49,9 +49,6 @@ final case class Mads[A: Semigroup](repr: Representation[A]) {
   val parser: Suspendable[A, A] = heading.orElse(paragraph)
 
   def parse(parts: Array[String], args: Array[Any]): Option[A] = {
-    import Complete.*
-    import Resumable.*
-
     def loop(idx: Int, result: Resumable[A, A]): Option[A] =
       if idx >= parts.size then result.get
       else

@@ -31,7 +31,7 @@ import cats.data.Chain
   * carry state across resumption boundaries.
   */
 enum Parser[A] {
-  import Parser._
+  import Parser.*
 
   def *>[B](that: Parser[B]): Parser[B] =
     (this.void ~ that).map(_.apply(1))
@@ -74,30 +74,28 @@ enum Parser[A] {
   def void: Parser[Unit] =
     Void(this)
 
-  def parse(input: String, offset: Int = 0): Complete[A] = {
-    import Complete._
-    import Parser._
+  def parse(input: String, offset: Int = 0): Result[A] = {
+    import Result.*
 
     if offset >= input.size then Epsilon(input, offset)
     else
       this match {
         case Character(ch) =>
-          if input(offset) == ch then Success(ch, input, offset + 1)
+          if input(offset) == ch then Success(ch, input, offset, offset + 1)
           else Epsilon(input, offset)
 
         case CharacterWhere(p) =>
           val ch = input(offset)
-          if p(ch) then Success(ch, input, offset + 1)
+          if p(ch) then Success(ch, input, offset, offset + 1)
           else Epsilon(input, offset)
 
         case CharactersWhile(p) =>
-          def loop(offset: Int): Int =
-            if offset == input.size then offset
-            else if p(input(offset)) then loop(offset + 1)
-            else offset
+          def loop(idx: Int): Result[A] =
+            if idx == input.size then Continue(input.substring(offset, idx), input, offset)
+            else if p(input(idx)) then loop(idx + 1)
+            else Success(input.substring(offset, idx), input, offset, idx)
 
-          val end = loop(offset)
-          Success(input.substring(offset, end), input, end)
+          loop(offset)
 
         case CharactersUntilTerminator(ts) =>
           var idx = -1
@@ -109,8 +107,8 @@ enum Parser[A] {
               nextOffset = idx + t.size
             ()
           }
-          if idx == -1 then Committed(input, input.size)
-          else Success(input.substring(offset, idx), input, nextOffset)
+          if idx == -1 then Committed(input, offset, input.size)
+          else Success(input.substring(offset, idx), input, offset, nextOffset)
 
         case CharactersUntilTerminatorOrEnd(ts) =>
           var idx = -1
@@ -122,36 +120,39 @@ enum Parser[A] {
               nextOffset = idx + t.size
             ()
           }
-          if idx == -1 then Success(input, input, input.size)
-          else Success(input.substring(offset, idx), input, nextOffset)
+          if idx == -1 then Success(input.substring(offset), input, offset, input.size)
+          else Success(input.substring(offset, idx), input, offset, nextOffset)
 
         case Exactly(s) =>
-          if input.startsWith(s, offset) then Success(s, input, offset + s.size)
+          if input.startsWith(s, offset) then Success(s, input, offset, offset + s.size)
           else Epsilon(input, offset)
 
         case Map(s, f) =>
           s.parse(input, offset) match {
-            case Epsilon(i, o)    => Epsilon(i, o)
-            case Committed(i, o)  => Committed(i, o)
-            case Success(a, i, o) => Success(f(a), i, o)
+            case e: Epsilon[A] => e
+            case c: Committed[A] => c
+            case Continue(a, i, s) => Continue(f(a), i, s)
+            case Success(a, i, s, o) => Success(f(a), i, s, o)
           }
 
         case OrElse(l, r) =>
           l.parse(input, offset) match {
-            case Epsilon(i, o)    => r.parse(i, o)
-            case Committed(i, o)  => Committed(i, o)
-            case Success(r, i, o) => Success(r, i, o)
+            case Epsilon(i, s)    => r.parse(i, s)
+            case c: Committed[A] => c
+            case c: Continue[A] => c
+            case s: Success[A] => s
           }
 
         case OneOf(parsers) =>
-          def loop[A](parsers: List[Parser[A]]): Complete[A] =
+          def loop[A](parsers: List[Parser[A]]): Result[A] =
             parsers match {
               case Nil => Epsilon(input, offset)
               case p :: ps =>
                 p.parse(input, offset) match {
-                  case Epsilon(i, o)    => loop(ps)
-                  case Committed(i, o)  => Committed(i, o)
-                  case Success(r, i, o) => Success(r, i, o)
+                  case e: Epsilon[A]   => loop(ps)
+                  case c: Committed[A] => c
+                  case c: Continue[A]  => c
+                  case s: Success[A]   => s
                 }
             }
 
@@ -159,13 +160,21 @@ enum Parser[A] {
 
         case Product(l, r) =>
           l.parse(input, offset) match {
-            case Epsilon(i, o)   => Epsilon(i, o)
-            case Committed(i, o) => Committed(i, o)
-            case Success(a, i, o) =>
-              r.parse(input, offset) match {
-                case Epsilon(i, o)    => Epsilon(i, o)
-                case Committed(i, o)  => Committed(i, o)
-                case Success(b, i, o) => Success((a, b), i, o)
+            case e: Epsilon[A]   => e
+            case c: Committed[A] => c
+            case Continue(a, i, s) =>
+              r.parse(i, i.size) match {
+                case e: Epsilon[A]   => e
+                case c: Committed[A] => c
+                case Continue(b, i, _) => Continue((a, b), i, s)
+                case Success(b, i, _, o) => Success((a, b), i, s, o)
+              }
+            case Success(a, i, s, o) =>
+              r.parse(i, o) match {
+                case e: Epsilon[A]   => e
+                case c: Committed[A] => c
+                case Continue(b, i, _) => Continue((a, b), i, s)
+                case Success(b, i, _, o) => Success((a, b), i, s, o)
               }
           }
 
@@ -180,22 +189,27 @@ enum Parser[A] {
               matched = str
               length = str.size
           )
-          if found then Success(matched, input, offset + length)
+          if found then Success(matched, input, offset, offset + length)
           else Epsilon(input, offset)
 
         case Void(p) =>
           p.parse(input, offset) match {
-            case Epsilon(i, o)    => Epsilon(i, o)
-            case Committed(i, o)  => Committed(i, o)
-            case Success(a, i, o) => Success((), i, o)
+            case e: Epsilon[A]   => e
+            case c: Committed[A] => c
+            case Continue(a, i, s) => Continue((), i, s)
+            case Success(a, i, s, o) => Success((), i, s, o)
           }
       }
   }
 
   def parseOrExn(input: String): A =
     this.parse(input, 0) match {
-      case Complete.Success(a, _, _) => a
-      case other => throw new Exception(s"Parsing failed with $other")
+      case Result.Epsilon(i, o)   =>
+        throw new IllegalStateException(s"Parser had an epsilon failure on input\n${i}\nat offset ${o}")
+      case Result.Committed(i, s, o) =>
+        throw new IllegalStateException(s"Parser had a committed failure on input\n${i}\nstarting at offset ${s} and finishing at offset ${o}")
+      case Result.Continue(a, _, _) => a
+      case Result.Success(a, _, _, _) => a
     }
 
   case Character(char: Char) extends Parser[Char]
@@ -214,9 +228,11 @@ enum Parser[A] {
   case Void(parser: Parser[A]) extends Parser[Unit]
 }
 object Parser {
+  /** Parse the given character. */
   def char(char: Char): Parser[Char] =
     Parser.Character(char)
 
+  /** Parse zero or more characters while the predicate is true. */
   def charWhere(predicate: Char => Boolean): Parser[Char] =
     Parser.CharacterWhere(predicate)
 
@@ -225,6 +241,7 @@ object Parser {
   def charsWhile(predicate: Char => Boolean): Parser[String] =
     Parser.CharactersWhile(predicate)
 
+  /** Parse zero or more characters until the predicate is true. */
   def charsUntil(predicate: Char => Boolean): Parser[String] =
     charsWhile(ch => !predicate(ch))
 
@@ -238,6 +255,7 @@ object Parser {
   def charsUntilTerminatorOrEnd(terminators: String*): Parser[String] =
     CharactersUntilTerminatorOrEnd(terminators)
 
+  /** Parse in order */
   def oneOf[A](parsers: List[Parser[A]]): Parser[A] =
     OneOf(parsers)
 
@@ -248,4 +266,40 @@ object Parser {
   /** Parse the longest matching string amongst the given strings */
   def stringIn(strings: Iterable[String]): Parser[String] =
     StringIn(strings)
+
+
+  /** The result type for a Parser
+   */
+  enum Result[+A] {
+
+    def isSuccess: Boolean =
+      this match {
+        case e: Epsilon[A] => false
+        case c: Committed[A] => false
+        case c: Continue[A] => true
+        case s: Success[A] => true
+      }
+
+    def isFailure: Boolean =
+      !isSuccess
+
+    /** Parsed nothing starting at the given position in the input */
+    case Epsilon(input: String, start: Int)
+
+    /** Parsed up to and including one character before the given offset and
+     * failed
+     */
+    case Committed(input: String, start: Int, offset: Int)
+
+    /**
+     *  Successfully parsed up to the end of input and could continue parsing if
+     *  more input was made available.
+     */
+    case Continue(result: A, input: String, start: Int)
+
+    /** Successfully parsed input up to and including one character before the
+     * given offset as result
+     */
+    case Success(result: A, input: String, start: Int, offset: Int)
+  }
 }
