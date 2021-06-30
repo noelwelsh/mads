@@ -13,17 +13,23 @@ class MadsSuite extends FunSuite {
 
   test("h1 with newline") {
     val input = List("# Heading 1\n")
+    val result = parse(input)
+
     assertEquals(
       parse(input).get,
-      Some("<h1>Heading 1</h1>")
+      Some("<h1>Heading 1</h1>"),
+      result
     )
   }
 
   test("h1 without newline") {
     val input = List("# Heading 1")
+    val result = parse(input)
+
     assertEquals(
       parse(input).get,
-      Some("<h1>Heading 1</h1>")
+      Some("<h1>Heading 1</h1>"),
+      result
     )
   }
 
@@ -33,7 +39,7 @@ class MadsSuite extends FunSuite {
 
     val result = parse(input, args)
 
-    assertEquals(result.get, Some("<h1>Heading 1</h1>"))
+    assertEquals(result.get, Some("<h1>Heading 1</h1>"), result)
   }
 
   test("h1 with arg and no newline") {

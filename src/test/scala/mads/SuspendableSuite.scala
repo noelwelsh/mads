@@ -28,4 +28,26 @@ class SuspendableSuite extends FunSuite {
       Parser.Result.Success("abc do ray me you and me", "123", 0, 3)
     )
   }
+
+  test("Suspendable.orElse succeeds if left succeeds") {
+    val left = Suspendable.fromParser(Parser.string("left"))
+    val right = Suspendable.fromParser(Parser.string("right"))
+    val parser = left.orElse(right)
+
+    assertEquals(
+      parser.parseToCompletion(List("left")),
+      Parser.Result.Success("left", "left", 0, 4)
+    )
+  }
+
+  test("Suspendable.orElse succeeds if right succeeds") {
+    val left = Suspendable.fromParser(Parser.string("left"))
+    val right = Suspendable.fromParser(Parser.string("right"))
+    val parser = left.orElse(right)
+
+    assertEquals(
+      parser.parseToCompletion(List("right")),
+      Parser.Result.Success("right", "right", 0, 5)
+    )
+  }
 }

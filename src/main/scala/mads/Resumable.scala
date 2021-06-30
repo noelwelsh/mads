@@ -26,6 +26,14 @@ enum Resumable[S, A] {
     this match {
       case Finished(Success(a, _, _, _)) => Some(a)
       case Finished(Continue(a, _, _))   => Some(a)
+      case Suspended(_, s, _, cont) => cont(Parser.Result.Success(s, "", 0, 0)).get
+      case _ => None
+    }
+
+  def getIfFinished: Option[A] =
+    this match {
+      case Finished(Success(a, _, _, _)) => Some(a)
+      case Finished(Continue(a, _, _))   => Some(a)
       case _                             => None
     }
 
