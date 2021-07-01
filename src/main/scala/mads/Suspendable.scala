@@ -2,6 +2,7 @@ package mads
 
 import cats.Semigroup
 import mads.continuation.*
+import cats.syntax.semigroup
 
 /** A parser that can be suspended
   *
@@ -78,6 +79,14 @@ enum Suspendable[S, A] {
             )
           )
         )
+
+      case Advance(parser, semigroup) =>
+        parser.parse(input, offset) match {
+          case Success(a, i, s, o) => continuation(Success(a, i, s, o))
+          case Continue(a, i, s) => Resumable.Advance(a, semigroup, continuation)
+          case Committed(i, s, o) => Resumable.committed(i, s, o)
+          case Epsilon(i, o) => Resumable.epsilon(i, o)
+        }
 
       case Suspend(parser, lift, semigroup) =>
         parser.parse(input, offset) match {
@@ -157,6 +166,9 @@ enum Suspendable[S, A] {
   /** Lift a Parser into a Suspendable parser allowing for resumption */
   case Suspend[A](parser: Parser[A], lift: String => A, semigroup: Semigroup[A])
       extends Suspendable[A, A]
+
+  /** Lift a Parser into a Supspendable parser that will continue to next parser when input ends */
+  case Advance[A](parser: Parser[A], semigroup: Semigroup[A]) extends Suspendable[A, A]
 
   /** Lift a Parser into a Suspendable parser without allowing for resumption */
   case Unsuspendable[S, A](parser: Parser[A]) extends Suspendable[S, A]

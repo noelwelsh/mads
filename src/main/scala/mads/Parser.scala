@@ -2,6 +2,7 @@ package mads
 
 import cats.Semigroup
 import cats.data.Chain
+import cats.syntax.semigroup
 
 /** A parser that produces a value of type A.
   *
@@ -60,16 +61,19 @@ enum Parser[A] {
   def orElse(that: Parser[A]): Parser[A] =
     OrElse(this, that)
 
-  def suspendable(using
+  def resume(using
       semigroup: Semigroup[A],
       ev: String =:= A
   ): Suspendable[A, A] =
     Suspendable.Suspend(this, str => ev(str), semigroup)
 
-  def suspendableWith(f: String => A)(using
+  def resumeWith(f: String => A)(using
       semigroup: Semigroup[A]
   ): Suspendable[A, A] =
     Suspendable.Suspend(this, f, semigroup)
+
+  def advance(using semigroup: Semigroup[A]): Suspendable[A, A] =
+    Suspendable.Advance(this, semigroup)
 
   def void: Parser[Unit] =
     Void(this)

@@ -21,10 +21,10 @@ final case class Mads[A: Semigroup](repr: Representation[A]) {
       Parser.stringIn(List("#", "##", "###", "####", "#####", "######"))
 
     val content: Suspendable[A, A] =
-      whiteSpace.suspendableWith(_ => ()) *> Parser
+      whiteSpace.advance *> Parser
         .charsUntilTerminatorOrEnd("\n", "\r\n")
         .map(repr.text)
-        .suspendableWith(repr.text)
+        .resumeWith(repr.text)
 
     (level ~ content).map((l, c) =>
       l match {

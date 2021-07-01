@@ -80,13 +80,16 @@ enum Resumable[S, A] {
       case None => this.inject(result).resume(input)
     }
 
-  /** Successfully parsed all input but was expecting additional input */
+  /** Successfully parsed all input and is expecting additional input */
   case Suspended[S, A](
       parser: Suspendable[S, S],
       partialResult: S,
       semigroup: Semigroup[S],
       continuation: Continuation[S, S, A]
   ) extends Resumable[S, A]
+
+  /** Sucessfully parsed all input and is not expecting additional input */
+  case Advance[S, A](result: S, semigroup: cats.Semigroup[S], continuation: Continuation[S, S, A]) extends Resumable[S, A]
 
   /** Parser has finished with its' input */
   case Finished(result: Parser.Result[A])
