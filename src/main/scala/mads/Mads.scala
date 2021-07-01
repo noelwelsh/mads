@@ -1,11 +1,11 @@
 package mads
 
-import cats.Semigroup
+import cats.{Monoid, Semigroup}
 import cats.data.Chain
 import cats.implicits._
 import cats.instances.string
 
-final case class Mads[A: Semigroup](repr: Representation[A]) {
+final case class Mads[A: Monoid](repr: Representation[A]) {
   import Mads._
   import Suspendable._
 

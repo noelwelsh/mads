@@ -15,7 +15,7 @@ enum Resumable[S, A] {
 
   def isFinished: Boolean =
     this match {
-      case Finished(_) => true
+      case Finished(_)        => true
       case s: Suspended[S, A] => false
     }
 
@@ -23,6 +23,14 @@ enum Resumable[S, A] {
     !isFinished
 
   def get: Option[A] =
+    this match {
+      case Finished(Success(a, _, _, _)) => Some(a)
+      case Finished(Continue(a, _, _))   => Some(a)
+      case Suspended(_, s, _, cont) => cont(Parser.Result.Success(s, "", 0, 0)).get
+      case _ => None
+    }
+
+  def getIfFinished: Option[A] =
     this match {
       case Finished(Success(a, _, _, _)) => Some(a)
       case Finished(Continue(a, _, _))   => Some(a)
@@ -34,9 +42,9 @@ enum Resumable[S, A] {
       case Suspended(p, s, semi, c) => Suspended(p, s, semi, c.map(f))
       case Finished(r) =>
         r match {
-          case Epsilon(i, s)    => epsilon(i, s)
+          case Epsilon(i, s)       => epsilon(i, s)
           case Committed(i, s, o)  => committed(i, s, o)
-          case Continue(a, i, s) => continue(f(a), i, s)
+          case Continue(a, i, s)   => continue(f(a), i, s)
           case Success(a, i, s, o) => success(f(a), i, s, o)
         }
     }
@@ -106,7 +114,12 @@ object Resumable {
   def continue[S, A](result: A, input: String, start: Int): Resumable[S, A] =
     Finished(Continue(result, input, start))
 
-  def success[S, A](result: A, input: String, start: Int, offset: Int): Resumable[S, A] =
+  def success[S, A](
+      result: A,
+      input: String,
+      start: Int,
+      offset: Int
+  ): Resumable[S, A] =
     Finished(Success(result, input, start, offset))
 
   def lift[S, A](result: Parser.Result[A]): Resumable[S, A] =

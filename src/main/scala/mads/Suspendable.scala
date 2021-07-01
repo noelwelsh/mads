@@ -59,7 +59,7 @@ enum Suspendable[S, A] {
           offset,
           Continuation(c =>
             c match {
-              case e: Epsilon[A] => right.loop(input, offset, continuation)
+              case Epsilon(_, _) => right.loop(input, offset, continuation)
               case other         => continuation(other)
             }
           )
@@ -90,10 +90,11 @@ enum Suspendable[S, A] {
 
       case Suspend(parser, lift, semigroup) =>
         parser.parse(input, offset) match {
-          case Success(a, i, s, o) => continuation(Success(a, i, s, o))
-          case Continue(a, i, s) => Resumable.Suspended(this, a, semigroup, continuation)
-          case Committed(i, s, o) => Resumable.committed(i, s, o)
-          case Epsilon(i, o) =>
+          case s @ Success(_, _, _, _) => continuation(s)
+          case Continue(a, i, s) =>
+            Resumable.Suspended(this, a, semigroup, continuation)
+          case c @ Committed(_, _, _) => continuation(c)
+          case e @ Epsilon(i, o) =>
             if o == i.size then
               Resumable.Suspended(
                 this,
@@ -101,16 +102,16 @@ enum Suspendable[S, A] {
                 semigroup,
                 continuation
               )
-            else Resumable.epsilon(i, o)
+            else continuation(e)
         }
 
       case Unsuspendable(parser) =>
         parser.parse(input, offset) match {
-          case s: Success[A] => continuation(s)
+          case s @ Success(_, _, _, _) => continuation(s)
           // This parser is unsuspendable so we convert a continue into committed
-          case Continue(a, i, s) => Resumable.committed(i, s, i.size)
-          case Committed(i, s, o)  => Resumable.committed(i, s, o)
-          case Epsilon(i, s)    => Resumable.epsilon(i, s)
+          case Continue(a, i, s)      => continuation(Committed(i, s, i.size))
+          case c @ Committed(_, _, _) => continuation(c)
+          case e @ Epsilon(_, _)      => continuation(e)
         }
     }
   }

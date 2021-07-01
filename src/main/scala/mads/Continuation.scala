@@ -10,13 +10,15 @@ object continuation {
     def apply[S, A, B](f: Result[A] => Resumable[S, B]): Continuation[S, A, B] =
       f
 
-    def onSuccess[S, A, B](f: (A, String, Int, Int) => Resumable[S, B]): Continuation[S, A, B] =
+    def onSuccess[S, A, B](
+        f: (A, String, Int, Int) => Resumable[S, B]
+    ): Continuation[S, A, B] =
       (c: Result[A]) =>
         c match {
           case Success(r, i, s, o) => f(r, i, s, o)
-          case Continue(r, i, s) => f(r, i, s, i.size)
-          case Committed(i, s, o) => Resumable.committed(i, s, o)
-          case Epsilon(i, s) => Resumable.epsilon(i, s)
+          case Continue(r, i, s)   => f(r, i, s, i.size)
+          case Committed(i, s, o)  => Resumable.committed(i, s, o)
+          case Epsilon(i, s)       => Resumable.epsilon(i, s)
         }
   }
 
