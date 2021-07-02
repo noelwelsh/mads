@@ -11,12 +11,12 @@ import mads.continuation.*
   */
 enum Resumable[S, A] {
   import Resumable.*
-  import Parser.Result.{Epsilon, Committed, Continue, Success}
+  import Suspendable.Result.{Epsilon, Committed, Success}
 
   def isFinished: Boolean =
     this match {
-      case Finished(_)        => true
-      case s: Suspended[S, A] => false
+      case Finished(_)           => true
+      case Suspended(_, _, _, _) => false
     }
 
   def isSuspension: Boolean =
@@ -25,16 +25,16 @@ enum Resumable[S, A] {
   def get: Option[A] =
     this match {
       case Finished(Success(a, _, _, _)) => Some(a)
-      case Finished(Continue(a, _, _))   => Some(a)
-      case Suspended(_, s, _, cont) => cont(Parser.Result.Success(s, "", 0, 0)).get
+      case Suspended(_, s, _, cont) =>
+        cont(Suspendable.Result.Success(s, "", 0, 0)).get
       case _ => None
     }
 
   def getIfFinished: Option[A] =
     this match {
       case Finished(Success(a, _, _, _)) => Some(a)
-      case Finished(Continue(a, _, _))   => Some(a)
-      case _                             => None
+      // case Finished(Continue(a, _, _))   => Some(a)
+      case _ => None
     }
 
   def map[B](f: A => B): Resumable[S, B] =
@@ -42,9 +42,9 @@ enum Resumable[S, A] {
       case Suspended(p, s, semi, c) => Suspended(p, s, semi, c.map(f))
       case Finished(r) =>
         r match {
-          case Epsilon(i, s)       => epsilon(i, s)
-          case Committed(i, s, o)  => committed(i, s, o)
-          case Continue(a, i, s)   => continue(f(a), i, s)
+          case Epsilon(i, s)      => epsilon(i, s)
+          case Committed(i, s, o) => committed(i, s, o)
+          // case Continue(a, i, s)   => continue(f(a), i, s)
           case Success(a, i, s, o) => success(f(a), i, s, o)
         }
     }
@@ -81,11 +81,19 @@ enum Resumable[S, A] {
       input: String,
       parser: Suspendable[S, A]
   )(using semigroup: Semigroup[A], ev: S =:= A): Resumable[S, A] =
-    get match {
-      case Some(a) =>
-        val r1 = semigroup.combine(a, ev(result))
-        parser.parse(input).map(r2 => semigroup.combine(r1, r2))
-      case None => this.inject(result).resume(input)
+    this match {
+      case Suspended(_, _, _, _) => this.inject(result).resume(input)
+      case Finished(r) =>
+        r match {
+          case Epsilon(i, s)      => epsilon(i, s)
+          case Committed(i, s, o) => committed(i, s, o)
+          // case Continue(a, i, s)   =>
+          //   val r1 = semigroup.combine(a, ev(result))
+          //   parser.parse(input).map(r2 => semigroup.combine(r1, r2))
+          case Success(a, i, s, o) =>
+            val r1 = semigroup.combine(a, ev(result))
+            parser.parse(input).map(r2 => semigroup.combine(r1, r2))
+        }
     }
 
   /** Successfully parsed all input and is expecting additional input */
@@ -96,23 +104,17 @@ enum Resumable[S, A] {
       continuation: Continuation[S, S, A]
   ) extends Resumable[S, A]
 
-  /** Sucessfully parsed all input and is not expecting additional input */
-  case Advance[S, A](result: S, semigroup: cats.Semigroup[S], continuation: Continuation[S, S, A]) extends Resumable[S, A]
-
   /** Parser has finished with its' input */
-  case Finished(result: Parser.Result[A])
+  case Finished(result: Suspendable.Result[A])
 }
 object Resumable {
-  import Parser.Result.{Epsilon, Committed, Continue, Success}
+  import Suspendable.Result.{Epsilon, Committed, Success}
 
   def epsilon[S, A](input: String, start: Int): Resumable[S, A] =
     Finished(Epsilon(input, start))
 
   def committed[S, A](input: String, start: Int, offset: Int): Resumable[S, A] =
     Finished(Committed(input, start, offset))
-
-  def continue[S, A](result: A, input: String, start: Int): Resumable[S, A] =
-    Finished(Continue(result, input, start))
 
   def success[S, A](
       result: A,
@@ -122,6 +124,6 @@ object Resumable {
   ): Resumable[S, A] =
     Finished(Success(result, input, start, offset))
 
-  def lift[S, A](result: Parser.Result[A]): Resumable[S, A] =
+  def lift[S, A](result: Suspendable.Result[A]): Resumable[S, A] =
     Finished(result)
 }

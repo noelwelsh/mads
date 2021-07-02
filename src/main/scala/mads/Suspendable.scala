@@ -11,8 +11,8 @@ import cats.syntax.semigroup
   */
 enum Suspendable[S, A] {
   import Resumable.{Suspended, Finished}
-  import Parser.Result
-  import Parser.Result.{Epsilon, Committed, Continue, Success}
+  import Suspendable.Result
+  import Suspendable.Result.{Epsilon, Committed, Success}
 
   /** Apply two parsers in sequence. Both must be resumable with the same type,
     * as from the outside we cannot tell whether we are resuming the left or
@@ -41,16 +41,14 @@ enum Suspendable[S, A] {
       offset: Int,
       continuation: Continuation[S, A, B]
   ): Resumable[S, B] = {
-    import Parser.Result.{Epsilon, Committed, Continue, Success}
+    import Suspendable.Result.{Epsilon, Committed, Success}
 
     this match {
       case Map(source, f) =>
         source.loop(
           input,
           offset,
-          Continuation.onSuccess((a, i, s, o) =>
-            continuation(Success(f(a), i, s, o))
-          )
+          continuation.contramap(f)
         )
 
       case OrElse(left, right) =>
@@ -59,42 +57,50 @@ enum Suspendable[S, A] {
           offset,
           Continuation(c =>
             c match {
-              case Epsilon(_, _) => right.loop(input, offset, continuation)
-              case other         => continuation(other)
+              case Epsilon(_, _) =>
+                right.loop(input, offset, continuation)
+              case other =>
+                continuation(other)
             }
           )
         )
 
-      case Product(left, right) =>
-        left.loop(
+      case p: Product[s, a, b] =>
+        p.left.loop(
           input,
           offset,
-          Continuation.onSuccess((a, i, s, o) =>
-            right.loop(
-              i,
-              o,
-              Continuation.onSuccess((b, i2, s2, o2) =>
-                continuation(Success((a, b), i2, s, o2))
-              )
-            )
+          Continuation((result: Result[a]) =>
+            result match {
+              case Success(a: a, i, s, o) =>
+                p.right.loop(i, o, continuation.contramap((b: b) => (a, b)))
+              case Committed(i, s, o) => continuation(Committed(i, s, o))
+              case Epsilon(i, o)      => continuation(Epsilon(i, o))
+            }
           )
         )
 
-      case Advance(parser, semigroup) =>
+      case Advance(parser) =>
         parser.parse(input, offset) match {
-          case Success(a, i, s, o) => continuation(Success(a, i, s, o))
-          case Continue(a, i, s) => Resumable.Advance(a, semigroup, continuation)
-          case Committed(i, s, o) => Resumable.committed(i, s, o)
-          case Epsilon(i, o) => Resumable.epsilon(i, o)
+          case Parser.Result.Success(a, i, s, o) =>
+            continuation(Success(a, i, s, o))
+          // Advance converts Continue to Success and we move on to the next
+          // parser, which will usually Epsilon complete and be suspended.
+          case Parser.Result.Continue(a, i, s) =>
+            continuation(Success(a, i, s, i.size))
+          case Parser.Result.Committed(i, s, o) =>
+            continuation(Committed(i, s, o))
+          case Parser.Result.Epsilon(i, o) => continuation(Epsilon(i, o))
         }
 
       case Suspend(parser, lift, semigroup) =>
         parser.parse(input, offset) match {
-          case s @ Success(_, _, _, _) => continuation(s)
-          case Continue(a, i, s) =>
+          case Parser.Result.Success(a, i, s, o) =>
+            continuation(Success(a, i, s, o))
+          case Parser.Result.Continue(a, i, s) =>
             Resumable.Suspended(this, a, semigroup, continuation)
-          case c @ Committed(_, _, _) => continuation(c)
-          case e @ Epsilon(i, o) =>
+          case Parser.Result.Committed(i, s, o) =>
+            continuation(Committed(i, s, o))
+          case Parser.Result.Epsilon(i, o) =>
             if o == i.size then
               Resumable.Suspended(
                 this,
@@ -102,16 +108,19 @@ enum Suspendable[S, A] {
                 semigroup,
                 continuation
               )
-            else continuation(e)
+            else continuation(Epsilon(i, o))
         }
 
       case Unsuspendable(parser) =>
         parser.parse(input, offset) match {
-          case s @ Success(_, _, _, _) => continuation(s)
+          case Parser.Result.Success(a, i, s, o) =>
+            continuation(Success(a, i, s, o))
           // This parser is unsuspendable so we convert a continue into committed
-          case Continue(a, i, s)      => continuation(Committed(i, s, i.size))
-          case c @ Committed(_, _, _) => continuation(c)
-          case e @ Epsilon(_, _)      => continuation(e)
+          case Parser.Result.Continue(a, i, s) =>
+            continuation(Committed(i, s, i.size))
+          case Parser.Result.Committed(i, s, o) =>
+            continuation(Committed(i, s, o))
+          case Parser.Result.Epsilon(i, o) => continuation(Epsilon(i, o))
         }
     }
   }
@@ -120,7 +129,7 @@ enum Suspendable[S, A] {
     loop(
       input,
       offset,
-      Continuation.onSuccess((a, i, s, o) => Resumable.success(a, i, s, o))
+      Continuation(c => Resumable.lift(c))
     )
 
   def parseToCompletion(
@@ -168,8 +177,10 @@ enum Suspendable[S, A] {
   case Suspend[A](parser: Parser[A], lift: String => A, semigroup: Semigroup[A])
       extends Suspendable[A, A]
 
-  /** Lift a Parser into a Supspendable parser that will continue to next parser when input ends */
-  case Advance[A](parser: Parser[A], semigroup: Semigroup[A]) extends Suspendable[A, A]
+  /** Lift a Parser into a Supspendable parser that will continue to next parser
+    * when input ends
+    */
+  case Advance[S, A](parser: Parser[A]) extends Suspendable[S, A]
 
   /** Lift a Parser into a Suspendable parser without allowing for resumption */
   case Unsuspendable[S, A](parser: Parser[A]) extends Suspendable[S, A]
@@ -177,4 +188,20 @@ enum Suspendable[S, A] {
 object Suspendable {
   def fromParser[S, A](parser: Parser[A]): Suspendable[S, A] =
     Suspendable.Unsuspendable(parser)
+
+  enum Result[+A] {
+
+    /** Parsed nothing starting at the given position in the input */
+    case Epsilon(input: String, start: Int)
+
+    /** Parsed up to and including one character before the given offset and
+      * failed
+      */
+    case Committed(input: String, start: Int, offset: Int)
+
+    /** Successfully parsed input up to and including one character before the
+      * given offset as result
+      */
+    case Success(result: A, input: String, start: Int, offset: Int)
+  }
 }

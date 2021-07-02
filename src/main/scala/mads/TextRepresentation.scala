@@ -10,7 +10,7 @@ object TextRepresentation extends Representation[String] {
   def h5(header: String): String = s"<h5>$header</h5>"
   def h6(header: String): String = s"<h6>$header</h6>"
 
-  def paragraph(content: String): String = content
+  def paragraph(content: String): String = s"<p>$content</p>"
 
   def argument(a: Any): String = a.toString
 

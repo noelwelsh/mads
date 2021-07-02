@@ -13,20 +13,42 @@ class SuspendableSuite extends FunSuite {
   test(
     "Suspendable parser suspends if underlying parser continues"
   ) {
-    val parser = Parser.charsUntilTerminatorOrEnd("123").suspendable
+    val parser = Parser.charsUntilTerminatorOrEnd("123").resume
     val result = parser.parse("abc")
     assert(result.isSuspension, result)
   }
 
   test("Suspendable parser consumes all parseable input across suspension") {
-    val parser = Parser.charsUntilTerminatorOrEnd("123").suspendable
+    val parser = Parser.charsUntilTerminatorOrEnd("123").resume
     val result =
       parser.parseToCompletion(List("abc ", "do ray me ", "you and me", "123"))
 
     assertEquals(
       result,
-      Parser.Result.Success("abc do ray me you and me", "123", 0, 3)
+      Suspendable.Result.Success("abc do ray me you and me", "123", 0, 3)
     )
+  }
+
+  test("Advance proceeds to next parser when input ends") {
+    val parser = Parser.charsWhile(_.isWhitespace).advance[String] *> Parser
+      .charsUntil(_.isWhitespace)
+      .resume
+    val result =
+      parser.parse("    ").injectAndResumeOrRestart("inject", "Doggie ", parser)
+
+    assertEquals(result, Resumable.success("injectDoggie", "Doggie ", 0, 6))
+  }
+
+  test(
+    "Advance proceeds to next parser when input ends + input ends after advance"
+  ) {
+    val parser = Parser.charsWhile(_.isWhitespace).advance[String] *> Parser
+      .charsUntilTerminatorOrEnd("<")
+      .resume
+    val result =
+      parser.parse("    ").injectAndResumeOrRestart("inject", "", parser).get
+
+    assertEquals(result, Some("inject"))
   }
 
   test("Suspendable.orElse succeeds if left succeeds") {
@@ -36,7 +58,7 @@ class SuspendableSuite extends FunSuite {
 
     assertEquals(
       parser.parseToCompletion(List("left")),
-      Parser.Result.Success("left", "left", 0, 4)
+      Suspendable.Result.Success("left", "left", 0, 4)
     )
   }
 
@@ -47,7 +69,7 @@ class SuspendableSuite extends FunSuite {
 
     assertEquals(
       parser.parseToCompletion(List("right")),
-      Parser.Result.Success("right", "right", 0, 5)
+      Suspendable.Result.Success("right", "right", 0, 5)
     )
   }
 }

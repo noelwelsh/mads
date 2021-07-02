@@ -72,8 +72,8 @@ enum Parser[A] {
   ): Suspendable[A, A] =
     Suspendable.Suspend(this, f, semigroup)
 
-  def advance(using semigroup: Semigroup[A]): Suspendable[A, A] =
-    Suspendable.Advance(this, semigroup)
+  def advance[S]: Suspendable[S, A] =
+    Suspendable.Advance(this)
 
   def void: Parser[Unit] =
     Void(this)
@@ -81,131 +81,132 @@ enum Parser[A] {
   def parse(input: String, offset: Int = 0): Result[A] = {
     import Result.*
 
-    if offset >= input.size then Epsilon(input, offset)
-    else
-      this match {
-        case Character(ch) =>
-          if input(offset) == ch then Success(ch, input, offset, offset + 1)
-          else Epsilon(input, offset)
+    this match {
+      case Character(ch) =>
+        if offset == input.size then Epsilon(input, offset)
+        else if input(offset) == ch then Success(ch, input, offset, offset + 1)
+        else Epsilon(input, offset)
 
-        case CharacterWhere(p) =>
+      case CharacterWhere(p) =>
+        if offset == input.size then Epsilon(input, offset)
+        else
           val ch = input(offset)
           if p(ch) then Success(ch, input, offset, offset + 1)
           else Epsilon(input, offset)
 
-        case CharactersWhile(p) =>
-          def loop(idx: Int): Result[A] =
-            if idx == input.size then
-              Continue(input.substring(offset, idx), input, offset)
-            else if p(input(idx)) then loop(idx + 1)
-            else Success(input.substring(offset, idx), input, offset, idx)
+      case CharactersWhile(p) =>
+        def loop(idx: Int): Result[A] =
+          if idx == input.size then
+            Continue(input.substring(offset, idx), input, offset)
+          else if p(input(idx)) then loop(idx + 1)
+          else Success(input.substring(offset, idx), input, offset, idx)
 
-          loop(offset)
+        loop(offset)
 
-        case CharactersUntilTerminator(ts) =>
-          var idx = -1
-          var nextOffset = -1
-          ts.foreach { t =>
-            val i = input.indexOf(t, offset)
-            if (i != -1) && ((idx == -1) || (i < idx)) then
-              idx = i
-              nextOffset = idx + t.size
-            ()
+      case CharactersUntilTerminator(ts) =>
+        var idx = -1
+        var nextOffset = -1
+        ts.foreach { t =>
+          val i = input.indexOf(t, offset)
+          if (i != -1) && ((idx == -1) || (i < idx)) then
+            idx = i
+            nextOffset = idx + t.size
+          ()
+        }
+        if idx == -1 then Committed(input, offset, input.size)
+        else Success(input.substring(offset, idx), input, offset, nextOffset)
+
+      case CharactersUntilTerminatorOrEnd(ts) =>
+        var idx = -1
+        var nextOffset = -1
+        ts.foreach { t =>
+          val i = input.indexOf(t, offset)
+          if (i != -1) && ((idx == -1) || (i < idx)) then
+            idx = i
+            nextOffset = idx + t.size
+          ()
+        }
+        if idx == -1 then Continue(input.substring(offset), input, offset)
+        else Success(input.substring(offset, idx), input, offset, nextOffset)
+
+      case Exactly(s) =>
+        if input.startsWith(s, offset) then
+          Success(s, input, offset, offset + s.size)
+        else Epsilon(input, offset)
+
+      case Map(s, f) =>
+        s.parse(input, offset) match {
+          case Epsilon(i, s)       => Epsilon(i, s)
+          case Committed(i, s, o)  => Committed(i, s, o)
+          case Continue(a, i, s)   => Continue(f(a), i, s)
+          case Success(a, i, s, o) => Success(f(a), i, s, o)
+        }
+
+      case OrElse(l, r) =>
+        l.parse(input, offset) match {
+          case Epsilon(i, s)       => r.parse(i, s)
+          case Committed(i, s, o)  => Committed(i, s, o)
+          case Continue(a, i, s)   => Continue(a, i, s)
+          case Success(a, i, s, o) => Success(a, i, s, o)
+        }
+
+      case OneOf(parsers) =>
+        def loop[A](parsers: List[Parser[A]]): Result[A] =
+          parsers match {
+            case Nil => Epsilon(input, offset)
+            case p :: ps =>
+              p.parse(input, offset) match {
+                case Epsilon(_, _)       => loop(ps)
+                case Committed(i, s, o)  => Committed(i, s, o)
+                case Continue(a, i, s)   => Continue(a, i, s)
+                case Success(a, i, s, o) => Success(a, i, s, o)
+              }
           }
-          if idx == -1 then Committed(input, offset, input.size)
-          else Success(input.substring(offset, idx), input, offset, nextOffset)
 
-        case CharactersUntilTerminatorOrEnd(ts) =>
-          var idx = -1
-          var nextOffset = -1
-          ts.foreach { t =>
-            val i = input.indexOf(t, offset)
-            if (i != -1) && ((idx == -1) || (i < idx)) then
-              idx = i
-              nextOffset = idx + t.size
-            ()
-          }
-          if idx == -1 then Continue(input.substring(offset), input, offset)
-          else Success(input.substring(offset, idx), input, offset, nextOffset)
+        loop(parsers)
 
-        case Exactly(s) =>
-          if input.startsWith(s, offset) then
-            Success(s, input, offset, offset + s.size)
-          else Epsilon(input, offset)
-
-        case Map(s, f) =>
-          s.parse(input, offset) match {
-            case Epsilon(i, s)       => Epsilon(i, s)
-            case Committed(i, s, o)  => Committed(i, s, o)
-            case Continue(a, i, s)   => Continue(f(a), i, s)
-            case Success(a, i, s, o) => Success(f(a), i, s, o)
-          }
-
-        case OrElse(l, r) =>
-          l.parse(input, offset) match {
-            case Epsilon(i, s)       => r.parse(i, s)
-            case Committed(i, s, o)  => Committed(i, s, o)
-            case Continue(a, i, s)   => Continue(a, i, s)
-            case Success(a, i, s, o) => Success(a, i, s, o)
-          }
-
-        case OneOf(parsers) =>
-          def loop[A](parsers: List[Parser[A]]): Result[A] =
-            parsers match {
-              case Nil => Epsilon(input, offset)
-              case p :: ps =>
-                p.parse(input, offset) match {
-                  case Epsilon(_, _)       => loop(ps)
-                  case Committed(i, s, o)  => Committed(i, s, o)
-                  case Continue(a, i, s)   => Continue(a, i, s)
-                  case Success(a, i, s, o) => Success(a, i, s, o)
-                }
+      case Product(l, r) =>
+        l.parse(input, offset) match {
+          case Epsilon(i, s)      => Epsilon(i, s)
+          case Committed(i, s, o) => Committed(i, s, o)
+          case Continue(a, i, s) =>
+            r.parse(i, i.size) match {
+              case Epsilon(i, s)       => Epsilon(i, s)
+              case Committed(i, s, o)  => Committed(i, s, o)
+              case Continue(b, i, _)   => Continue((a, b), i, s)
+              case Success(b, i, _, o) => Success((a, b), i, s, o)
             }
+          case Success(a, i, s, o) =>
+            r.parse(i, o) match {
+              case Epsilon(i, s)       => Epsilon(i, s)
+              case Committed(i, s, o)  => Committed(i, s, o)
+              case Continue(b, i, _)   => Continue((a, b), i, s)
+              case Success(b, i, _, o) => Success((a, b), i, s, o)
+            }
+        }
 
-          loop(parsers)
+      case StringIn(s) =>
+        var found = false
+        var length = -1
+        var matched: String = null
 
-        case Product(l, r) =>
-          l.parse(input, offset) match {
-            case Epsilon(i, s)      => Epsilon(i, s)
-            case Committed(i, s, o) => Committed(i, s, o)
-            case Continue(a, i, s) =>
-              r.parse(i, i.size) match {
-                case Epsilon(i, s)       => Epsilon(i, s)
-                case Committed(i, s, o)  => Committed(i, s, o)
-                case Continue(b, i, _)   => Continue((a, b), i, s)
-                case Success(b, i, _, o) => Success((a, b), i, s, o)
-              }
-            case Success(a, i, s, o) =>
-              r.parse(i, o) match {
-                case Epsilon(i, s)       => Epsilon(i, s)
-                case Committed(i, s, o)  => Committed(i, s, o)
-                case Continue(b, i, _)   => Continue((a, b), i, s)
-                case Success(b, i, _, o) => Success((a, b), i, s, o)
-              }
-          }
+        s.foreach(str =>
+          if (str.size > length) && input.startsWith(str, offset) then
+            found = true
+            matched = str
+            length = str.size
+        )
+        if found then Success(matched, input, offset, offset + length)
+        else Epsilon(input, offset)
 
-        case StringIn(s) =>
-          var found = false
-          var length = -1
-          var matched: String = null
-
-          s.foreach(str =>
-            if (str.size > length) && input.startsWith(str, offset) then
-              found = true
-              matched = str
-              length = str.size
-          )
-          if found then Success(matched, input, offset, offset + length)
-          else Epsilon(input, offset)
-
-        case Void(p) =>
-          p.parse(input, offset) match {
-            case Epsilon(i, s)       => Epsilon(i, s)
-            case Committed(i, s, o)  => Committed(i, s, o)
-            case Continue(a, i, s)   => Continue((), i, s)
-            case Success(a, i, s, o) => Success((), i, s, o)
-          }
-      }
+      case Void(p) =>
+        p.parse(input, offset) match {
+          case Epsilon(i, s)       => Epsilon(i, s)
+          case Committed(i, s, o)  => Committed(i, s, o)
+          case Continue(a, i, s)   => Continue((), i, s)
+          case Success(a, i, s, o) => Success((), i, s, o)
+        }
+    }
   }
 
   def parseOrExn(input: String): A =

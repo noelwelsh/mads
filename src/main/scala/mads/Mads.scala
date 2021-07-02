@@ -21,7 +21,7 @@ final case class Mads[A: Monoid](repr: Representation[A]) {
       Parser.stringIn(List("#", "##", "###", "####", "#####", "######"))
 
     val content: Suspendable[A, A] =
-      whiteSpace.advance *> Parser
+      whiteSpace.advance[A] *> Parser
         .charsUntilTerminatorOrEnd("\n", "\r\n")
         .map(repr.text)
         .resumeWith(repr.text)
@@ -42,7 +42,7 @@ final case class Mads[A: Monoid](repr: Representation[A]) {
     Parser
       .charsUntilTerminatorOrEnd("\n", "\r\n")
       .map(repr.text)
-      .suspendableWith(repr.text)
+      .resumeWith(repr.text)
       .map(repr.paragraph)
   }
 
@@ -63,39 +63,5 @@ final case class Mads[A: Monoid](repr: Representation[A]) {
   }
 }
 object Mads {
-  enum Element {
-    case Part(part: String)
-    case Argument(arg: Any)
-    case Eof
-  }
-
-  final case class Heading[A](level: HeadingLevel, content: A)
-  enum HeadingLevel {
-    case H1
-    case H2
-    case H3
-    case H4
-    case H5
-    case H6
-  }
-
-  final case class InputState(
-      parts: Array[String],
-      args: Array[Any],
-      partIndex: Int,
-      argIndex: Int,
-      inPart: Boolean
-  ) {
-    def next: (InputState, Element) =
-      if inPart && (partIndex < parts.size) then
-        val elt = parts(partIndex)
-        val next = this.copy(partIndex = partIndex + 1, inPart = !inPart)
-        (next, Element.Part(elt))
-      else if !inPart && (argIndex < args.size) then
-        val elt = args(argIndex)
-        val next = this.copy(argIndex = argIndex + 1, inPart = !inPart)
-        (next, Element.Argument(elt))
-      else (this, Element.Eof)
-  }
-
+  val madsText = Mads(TextRepresentation)
 }

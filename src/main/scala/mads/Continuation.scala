@@ -1,25 +1,14 @@
 package mads
 
 import Resumable.{Suspended, Finished}
-import Parser.Result
-import Parser.Result.{Epsilon, Committed, Continue, Success}
+import Suspendable.Result
+import Suspendable.Result.{Epsilon, Committed, Success}
 
 object continuation {
   opaque type Continuation[S, A, B] = Result[A] => Resumable[S, B]
   object Continuation {
     def apply[S, A, B](f: Result[A] => Resumable[S, B]): Continuation[S, A, B] =
       f
-
-    def onSuccess[S, A, B](
-        f: (A, String, Int, Int) => Resumable[S, B]
-    ): Continuation[S, A, B] =
-      (c: Result[A]) =>
-        c match {
-          case Success(r, i, s, o) => f(r, i, s, o)
-          case Continue(r, i, s)   => f(r, i, s, i.size)
-          case Committed(i, s, o)  => Resumable.committed(i, s, o)
-          case Epsilon(i, s)       => Resumable.epsilon(i, s)
-        }
   }
 
   extension [S, A, B](cont: Continuation[S, A, B]) {
@@ -28,5 +17,14 @@ object continuation {
 
     def map[C](f: B => C): Continuation[S, A, C] =
       Continuation((c: Result[A]) => cont(c).map(f))
+
+    def contramap[C](f: C => A): Continuation[S, C, B] =
+      Continuation((c: Result[C]) =>
+        c match {
+          case Success(c, i, s, o) => cont(Success(f(c), i, s, o))
+          case Committed(i, s, o)  => cont(Committed(i, s, o))
+          case Epsilon(i, o)       => cont(Epsilon(i, o))
+        }
+      )
   }
 }
