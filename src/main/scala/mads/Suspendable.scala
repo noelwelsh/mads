@@ -1,8 +1,9 @@
 package mads
 
 import cats.Semigroup
+import cats.data.NonEmptyChain
+import cats.implicits._
 import mads.continuation.*
-import cats.syntax.semigroup
 
 /** A parser that can be suspended
   *
@@ -27,12 +28,24 @@ enum Suspendable[S, A] {
   def <*[B](that: Suspendable[S, B]): Suspendable[S, A] =
     (this ~ that.void).map(_.apply(0))
 
+  /** If this parser fails with a committed result convert it to an epsilon
+    * result so that processing can continue with another parser. Usually used
+    * in conjection with orElse.
+    */
+  def backtrack: Suspendable[S, A] =
+    Backtrack(this)
+
   def orElse(that: Suspendable[S, A]): Suspendable[S, A] =
     OrElse(this, that)
 
   def map[B](f: A => B): Suspendable[S, B] =
     Map(this, f)
 
+  /** Repeat this parser one or more times */
+  def rep: Suspendable[S, NonEmptyChain[A]] =
+    Rep(this)
+
+  /** Ignore the output of this parser */
   def void: Suspendable[S, Unit] =
     this.map(_ => ())
 
@@ -44,6 +57,19 @@ enum Suspendable[S, A] {
     import Suspendable.Result.{Epsilon, Committed, Success}
 
     this match {
+      case Backtrack(source) =>
+        source.loop(
+          input,
+          offset,
+          Continuation((result) =>
+            result match {
+              case s @ Success(_, _, _, _) => continuation(s)
+              case Committed(i, s, _)      => continuation(Epsilon(i, s))
+              case e @ Epsilon(_, _)       => continuation(e)
+            }
+          )
+        )
+
       case Map(source, f) =>
         source.loop(
           input,
@@ -73,6 +99,37 @@ enum Suspendable[S, A] {
             result match {
               case Success(a: a, i, s, o) =>
                 p.right.loop(i, o, continuation.contramap((b: b) => (a, b)))
+              case Committed(i, s, o) => continuation(Committed(i, s, o))
+              case Epsilon(i, o)      => continuation(Epsilon(i, o))
+            }
+          )
+        )
+
+      case r: Rep[s, a] =>
+        def repeat(accum: Success[NonEmptyChain[a]]): Resumable[S, B] =
+          // Don't allow infinite loops on parsers that don't make progress
+          if accum.offset == accum.input.size then continuation(accum)
+          else
+            r.source.loop(
+              input,
+              accum.offset,
+              Continuation((result: Result[a]) =>
+                result match {
+                  case Success(a, i, s, o) =>
+                    repeat(Success(accum.result :+ a, i, offset, o))
+                  case Committed(i, s, o) => continuation(accum)
+                  case Epsilon(i, o)      => continuation(accum)
+                }
+              )
+            )
+
+        r.source.loop(
+          input,
+          offset,
+          Continuation((result: Result[a]) =>
+            result match {
+              case Success(a, i, s, o) =>
+                repeat(Success(NonEmptyChain(a), i, s, o))
               case Committed(i, s, o) => continuation(Committed(i, s, o))
               case Epsilon(i, o)      => continuation(Epsilon(i, o))
             }
@@ -166,12 +223,15 @@ enum Suspendable[S, A] {
       case other => throw new Exception(s"Parsing failed with $other")
     }
 
+  case Backtrack[S, A](parser: Suspendable[S, A]) extends Suspendable[S, A]
+  case Map[S, A, B](source: Suspendable[S, A], f: A => B)
+      extends Suspendable[S, B]
   case OrElse[S, A](left: Suspendable[S, A], right: Suspendable[S, A])
       extends Suspendable[S, A]
   case Product[S, A, B](left: Suspendable[S, A], right: Suspendable[S, B])
       extends Suspendable[S, (A, B)]
-  case Map[S, A, B](source: Suspendable[S, A], f: A => B)
-      extends Suspendable[S, B]
+  case Rep[S, A](source: Suspendable[S, A])
+      extends Suspendable[S, NonEmptyChain[A]]
 
   /** Lift a Parser into a Suspendable parser allowing for resumption */
   case Suspend[A](parser: Parser[A], lift: String => A, semigroup: Semigroup[A])

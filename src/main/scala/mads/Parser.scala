@@ -67,13 +67,16 @@ enum Parser[A] {
   ): Suspendable[A, A] =
     Suspendable.Suspend(this, str => ev(str), semigroup)
 
+  def advance[S]: Suspendable[S, A] =
+    Suspendable.Advance(this)
+
   def resumeWith(f: String => A)(using
       semigroup: Semigroup[A]
   ): Suspendable[A, A] =
     Suspendable.Suspend(this, f, semigroup)
 
-  def advance[S]: Suspendable[S, A] =
-    Suspendable.Advance(this)
+  def unsuspendable[S]: Suspendable[S, A] =
+    Suspendable.Unsuspendable(this)
 
   def void: Parser[Unit] =
     Void(this)

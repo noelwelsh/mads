@@ -22,11 +22,15 @@ enum Resumable[S, A] {
   def isSuspension: Boolean =
     !isFinished
 
-  def get: Option[A] =
+  def get(using ev: S =:= A): Option[A] =
     this match {
       case Finished(Success(a, _, _, _)) => Some(a)
       case Suspended(_, s, _, cont) =>
-        cont(Suspendable.Result.Success(s, "", 0, 0)).get
+        cont(Suspendable.Result.Success(s, "", 0, 0)) match {
+          case Finished(Success(a, _, _, _)) => Some(a)
+          case Suspended(_, s, _, _) => Some(ev(s))
+          case _ => None
+        }
       case _ => None
     }
 

@@ -1,5 +1,6 @@
 package mads
 
+import cats.implicits._
 import munit.FunSuite
 
 class MadsSuite extends FunSuite {
@@ -17,7 +18,7 @@ class MadsSuite extends FunSuite {
 
     assertEquals(
       parse(input).get,
-      Some("<h1>Heading 1</h1>"),
+      "<h1>Heading 1</h1>".some,
       result
     )
   }
@@ -56,5 +57,18 @@ class MadsSuite extends FunSuite {
 
     val result = parse(input)
     assertEquals(result.get, Some("<p>This is mad!</p>"), result)
+  }
+
+  test("Document with h1 and p") {
+    val input = List("""
+    |# Just A Test
+    |
+    |Let's test this works.
+    |""".stripMargin)
+
+    val expected = "<h1>Just A Test</h1><p>Let's test this works.</p>".stripMargin
+
+    val result = parse(input)
+    assertEquals(result.get, Some(expected))
   }
 }

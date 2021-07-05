@@ -1,5 +1,6 @@
 package mads
 
+import cats.data._
 import munit.FunSuite
 
 class SuspendableSuite extends FunSuite {
@@ -29,7 +30,7 @@ class SuspendableSuite extends FunSuite {
     )
   }
 
-  test("Advance proceeds to next parser when input ends") {
+  test(".advance proceeds to next parser when input ends") {
     val parser = Parser.charsWhile(_.isWhitespace).advance[String] *> Parser
       .charsUntil(_.isWhitespace)
       .resume
@@ -40,7 +41,7 @@ class SuspendableSuite extends FunSuite {
   }
 
   test(
-    "Advance proceeds to next parser when input ends + input ends after advance"
+    ".advance proceeds to next parser when input ends + input ends after advance"
   ) {
     val parser = Parser.charsWhile(_.isWhitespace).advance[String] *> Parser
       .charsUntilTerminatorOrEnd("<")
@@ -51,7 +52,7 @@ class SuspendableSuite extends FunSuite {
     assertEquals(result, Some("inject"))
   }
 
-  test("Suspendable.orElse succeeds if left succeeds") {
+  test(".orElse succeeds if left succeeds") {
     val left = Suspendable.fromParser(Parser.string("left"))
     val right = Suspendable.fromParser(Parser.string("right"))
     val parser = left.orElse(right)
@@ -62,7 +63,7 @@ class SuspendableSuite extends FunSuite {
     )
   }
 
-  test("Suspendable.orElse succeeds if right succeeds") {
+  test(".orElse succeeds if right succeeds") {
     val left = Suspendable.fromParser(Parser.string("left"))
     val right = Suspendable.fromParser(Parser.string("right"))
     val parser = left.orElse(right)
@@ -70,6 +71,43 @@ class SuspendableSuite extends FunSuite {
     assertEquals(
       parser.parseToCompletion(List("right")),
       Suspendable.Result.Success("right", "right", 0, 5)
+    )
+  }
+
+  test(".rep repeats until parser does not succeed") {
+    val parser = Parser.char('a').unsuspendable.rep
+    val input = "aaaa "
+
+    assertEquals(
+      parser.parse(input),
+      Resumable.success(NonEmptyChain('a', 'a', 'a', 'a'), input, 0, 4)
+    )
+  }
+
+  test(".rep accumulates results in correct order") {
+    val parser = Parser.charWhere(_.isDigit).unsuspendable.rep
+    val input = "1234 "
+
+    assertEquals(
+      parser.parse(input),
+      Resumable.success(NonEmptyChain('1', '2', '3', '4'), input, 0, 4)
+    )
+  }
+
+  test(".rep fails if parser doesn't parse at least once") {
+    val parser = Parser.charWhere(_.isDigit).unsuspendable.rep
+    val input = " "
+
+    assertEquals(parser.parse(input), Resumable.epsilon(input, 0))
+  }
+
+  test(".rep succeeds if parser parses at least once") {
+    val parser = Parser.charWhere(_.isDigit).unsuspendable.rep
+    val input = "1 "
+
+    assertEquals(
+      parser.parse(input),
+      Resumable.success(NonEmptyChain('1'), input, 0, 1)
     )
   }
 }

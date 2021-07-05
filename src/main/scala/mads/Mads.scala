@@ -5,14 +5,14 @@ import cats.data.Chain
 import cats.implicits._
 import cats.instances.string
 
-final case class Mads[A: Monoid](repr: Representation[A]) {
+final case class Mads[A](repr: Representation[A])(using monoid: Monoid[A]) {
   import Mads._
   import Suspendable._
 
   val lineEnd: Parser[Unit] =
     Parser.string("\r\n").orElse(Parser.string("\n")).void
-  val whiteSpace: Parser[Unit] = Parser.charsWhile(_.isWhitespace).void
-  val emptyLine: Parser[Unit] = (whiteSpace ~ lineEnd).void
+  val whiteSpace: Parser[Unit] = Parser.charsWhile(ch => ch == ' ' || ch == '\t').void
+  val emptyLine: Parser[A] = (whiteSpace *> lineEnd).map(_ => monoid.empty)
 
   val hash = Parser.char('#')
 
@@ -46,7 +46,12 @@ final case class Mads[A: Monoid](repr: Representation[A]) {
       .map(repr.paragraph)
   }
 
-  val parser: Suspendable[A, A] = heading.orElse(paragraph)
+  val parser: Suspendable[A, A] =
+    emptyLine.unsuspendable.backtrack
+      .orElse(heading.backtrack)
+      .orElse(paragraph.backtrack)
+      .rep
+      .map(_.combineAll)
 
   def parse(parts: Array[String], args: Array[Any]): Resumable[A, A] = {
     def loop(idx: Int, result: Resumable[A, A]): Resumable[A, A] =
