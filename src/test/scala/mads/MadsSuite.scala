@@ -66,7 +66,11 @@ class MadsSuite extends FunSuite {
     |""".stripMargin)
 
     val result = parse(input)
-    assertEquals(result.get, Some("<p>How much wood\nWould a woodchuck chuck?\n</p>"), result)
+    assertEquals(
+      result.get,
+      Some("<p>How much wood\nWould a woodchuck chuck?\n</p>"),
+      result
+    )
   }
 
   test("Document with h1 and p") {
@@ -76,7 +80,8 @@ class MadsSuite extends FunSuite {
     |Let's test this works.
     |""".stripMargin)
 
-    val expected = "<h1>Just A Test</h1><p>Let's test this works.\n</p>".stripMargin
+    val expected =
+      "<h1>Just A Test</h1><p>Let's test this works.\n</p>".stripMargin
 
     val result = parse(input)
     assertEquals(result.get, Some(expected))

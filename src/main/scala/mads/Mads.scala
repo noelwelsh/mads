@@ -11,7 +11,8 @@ final case class Mads[A](repr: Representation[A])(using monoid: Monoid[A]) {
 
   val lineEnd: Parser[Unit] =
     Parser.string("\r\n").orElse(Parser.string("\n")).void
-  val whiteSpace: Parser[Unit] = Parser.charsWhile(ch => ch == ' ' || ch == '\t').void
+  val whiteSpace: Parser[Unit] =
+    Parser.charsWhile(ch => ch == ' ' || ch == '\t').void
   val emptyLine: Parser[A] = (whiteSpace *> lineEnd).map(_ => monoid.empty)
 
   val hash = Parser.char('#')
@@ -24,7 +25,10 @@ final case class Mads[A](repr: Representation[A])(using monoid: Monoid[A]) {
       whiteSpace.advance[A] *> Parser
         .charsUntilTerminatorOrEnd("\n", "\r\n")
         .map(repr.text)
-        .resumeWith(repr.text)
+        .resumeWith(repr.text) <* Parser0.charsThroughTerminatorOrEnd(
+        "\n",
+        "\r\n"
+      )
 
     (level ~ content).map((l, c) =>
       l match {

@@ -4,7 +4,12 @@ import scala.util.matching.Regex
 
 /** Parsers constructed through these methods consume zero or more characters */
 object Parser0 {
-  import Parser.{CharactersWhile, CharactersUntilRegexOrEnd, CharactersUntilTerminator, CharactersUntilTerminatorOrEnd}
+  import Parser.{
+    CharactersWhile,
+    CharactersUntilRegexOrEnd,
+    CharactersUntilTerminator,
+    CharactersUntilTerminatorOrEnd
+  }
 
   /** Parses zero or more character while predicate succeeds.
     */
@@ -16,7 +21,8 @@ object Parser0 {
     charsWhile(ch => !predicate(ch))
 
   /** Parse zero or more characters until the first match of the regular
-   * expression or the end of the input */
+    * expression or the end of the input
+    */
   def charsUntilRegexOrEnd(regex: Regex): Parser[String] =
     CharactersUntilRegexOrEnd(regex, true, false)
 

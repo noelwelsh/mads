@@ -24,19 +24,34 @@ class Parser0Suite extends FunSuite {
     val parser = Parser0.charsUntilRegexOrEnd("1[2-4]+".r)
 
     val endsInTerminator = "abcd13"
-    assertEquals(parser.parse(endsInTerminator), Result.Success("abcd", endsInTerminator, 0, 4))
+    assertEquals(
+      parser.parse(endsInTerminator),
+      Result.Success("abcd", endsInTerminator, 0, 4)
+    )
 
     val endsWithoutTerminator1 = "abcd"
-    assertEquals(parser.parse(endsWithoutTerminator1), Result.Continue(endsWithoutTerminator1, endsWithoutTerminator1, 0))
+    assertEquals(
+      parser.parse(endsWithoutTerminator1),
+      Result.Continue(endsWithoutTerminator1, endsWithoutTerminator1, 0)
+    )
 
     val endsWithoutTerminator2 = "abcd15"
-    assertEquals(parser.parse(endsWithoutTerminator2), Result.Continue(endsWithoutTerminator2, endsWithoutTerminator2, 0))
+    assertEquals(
+      parser.parse(endsWithoutTerminator2),
+      Result.Continue(endsWithoutTerminator2, endsWithoutTerminator2, 0)
+    )
 
     val endsAtFirstMatch = "abcd12ef12"
-    assertEquals(parser.parse(endsAtFirstMatch), Result.Success("abcd", endsAtFirstMatch, 0, 4))
+    assertEquals(
+      parser.parse(endsAtFirstMatch),
+      Result.Success("abcd", endsAtFirstMatch, 0, 4)
+    )
 
     val endsImmediately = "12"
-    assertEquals(parser.parse(endsImmediately), Result.Success("", endsImmediately, 0, 0))
+    assertEquals(
+      parser.parse(endsImmediately),
+      Result.Success("", endsImmediately, 0, 0)
+    )
   }
 
   test("Parser0.charsUntilTerminator") {
