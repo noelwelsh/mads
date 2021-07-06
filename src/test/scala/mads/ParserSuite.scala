@@ -49,6 +49,25 @@ class ParserSuite extends FunSuite {
     assertEquals(parser.parse(endsImmediately), Result.Epsilon(endsImmediately, 0))
   }
 
+  test("Parser.charsThroughRegexOrEnd") {
+    val parser = Parser.charsThroughRegexOrEnd("1[2-4]+".r)
+
+    val endsInTerminator = "abcd13"
+    assertEquals(parser.parse(endsInTerminator), Result.Success("abcd13", endsInTerminator, 0, 6))
+
+    val endsWithoutTerminator1 = "abcd"
+    assertEquals(parser.parse(endsWithoutTerminator1), Result.Continue(endsWithoutTerminator1, endsWithoutTerminator1, 0))
+
+    val endsWithoutTerminator2 = "abcd15"
+    assertEquals(parser.parse(endsWithoutTerminator2), Result.Continue(endsWithoutTerminator2, endsWithoutTerminator2, 0))
+
+    val endsAtFirstMatch = "abcd12ef12"
+    assertEquals(parser.parse(endsAtFirstMatch), Result.Success("abcd12", endsAtFirstMatch, 0, 6))
+
+    val endsImmediately = "12"
+    assertEquals(parser.parse(endsImmediately), Result.Success(endsImmediately, endsImmediately, 0, 2))
+  }
+
   test("Parser.charsUntilTerminator") {
     assertEquals(
       Parser.charsUntilTerminator("abc").parse("123abc"),
@@ -69,6 +88,29 @@ class ParserSuite extends FunSuite {
     assertEquals(
       Parser.charsUntilTerminator("abc").parse("abc"),
       Result.Epsilon("abc", 0)
+    )
+  }
+
+  test("Parser.charsThroughTerminator") {
+    assertEquals(
+      Parser.charsThroughTerminator("abc").parse("123abc"),
+      Result.Success("123abc", "123abc", 0, 6)
+    )
+    assertEquals(
+      Parser.charsThroughTerminator("a", "bc").parse("123abc"),
+      Result.Success("123a", "123abc", 0, 4)
+    )
+    assertEquals(
+      Parser.charsThroughTerminator("a", "b").parse("123b"),
+      Result.Success("123b", "123b", 0, 4)
+    )
+    assertEquals(
+      Parser.charsThroughTerminator("abc").parse("123"),
+      Result.Committed("123", 0, 3)
+    )
+    assertEquals(
+      Parser.charsThroughTerminator("abc").parse("abc"),
+      Result.Success("abc", "abc", 0, 3)
     )
   }
 
@@ -96,6 +138,33 @@ class ParserSuite extends FunSuite {
     assertEquals(
       Parser.charsUntilTerminatorOrEnd("abc").parse("abc"),
       Result.Epsilon("abc", 0)
+    )
+  }
+
+  test("Parser.charsThroughTerminatorOrEnd") {
+    assertEquals(
+      Parser.charsThroughTerminatorOrEnd("\n").parse("123abc"),
+      Result.Continue("123abc", "123abc", 0)
+    )
+    assertEquals(
+      Parser.charsThroughTerminatorOrEnd("\n").parse("123abc\n"),
+      Result.Success("123abc\n", "123abc\n", 0, 7)
+    )
+    assertEquals(
+      Parser.charsThroughTerminatorOrEnd(">", "<").parse("123<"),
+      Result.Success("123<", "123<", 0, 4)
+    )
+    assertEquals(
+      Parser.charsThroughTerminatorOrEnd(">", "<").parse("123>"),
+      Result.Success("123>", "123>", 0, 4)
+    )
+    assertEquals(
+      Parser.charsThroughTerminatorOrEnd(">", "<").parse("123"),
+      Result.Continue("123", "123", 0)
+    )
+    assertEquals(
+      Parser.charsThroughTerminatorOrEnd("abc").parse("abc"),
+      Result.Success("abc", "abc", 0, 3)
     )
   }
 
