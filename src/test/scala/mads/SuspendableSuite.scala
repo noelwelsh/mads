@@ -4,22 +4,22 @@ import cats.data._
 import munit.FunSuite
 
 class SuspendableSuite extends FunSuite {
-  test("Unsuspendable parser uses underlying parser") {
+  test("Parser.unsuspendable uses underlying parser") {
     assertEquals(
-      Suspendable.fromParser(Parser.char('a')).parse("a"),
+      Parser.char('a').unsuspendable.parse("a"),
       Resumable.success('a', "a", 0, 1)
     )
   }
 
   test(
-    "Suspendable parser suspends if underlying parser continues"
+    "Parser.resume suspends if underlying parser continues"
   ) {
     val parser = Parser.charsUntilTerminatorOrEnd("123").resume
     val result = parser.parse("abc")
     assert(result.isSuspension, result)
   }
 
-  test("Suspendable parser consumes all parseable input across suspension") {
+  test("Parser.resume consumes all parseable input across suspension") {
     val parser = Parser.charsUntilTerminatorOrEnd("123").resume
     val result =
       parser.parseToCompletion(List("abc ", "do ray me ", "you and me", "123"))
@@ -30,7 +30,7 @@ class SuspendableSuite extends FunSuite {
     )
   }
 
-  test(".advance proceeds to next parser when input ends") {
+  test("Parser.advance proceeds to next parser when input ends") {
     val parser = Parser.charsWhile(_.isWhitespace).advance[String] *> Parser
       .charsUntil(_.isWhitespace)
       .resume
@@ -41,7 +41,7 @@ class SuspendableSuite extends FunSuite {
   }
 
   test(
-    ".advance proceeds to next parser when input ends + input ends after advance"
+    "Parser.advance proceeds to next parser when input ends + input ends after advance"
   ) {
     val parser = Parser.charsWhile(_.isWhitespace).advance[String] *> Parser
       .charsUntilTerminatorOrEnd("<")
@@ -52,7 +52,7 @@ class SuspendableSuite extends FunSuite {
     assertEquals(result, Some("inject"))
   }
 
-  test(".orElse succeeds if left succeeds") {
+  test("Suspendable.orElse succeeds if left succeeds") {
     val left = Suspendable.fromParser(Parser.string("left"))
     val right = Suspendable.fromParser(Parser.string("right"))
     val parser = left.orElse(right)
@@ -63,7 +63,7 @@ class SuspendableSuite extends FunSuite {
     )
   }
 
-  test(".orElse succeeds if right succeeds") {
+  test("Suspendable.orElse succeeds if right succeeds") {
     val left = Suspendable.fromParser(Parser.string("left"))
     val right = Suspendable.fromParser(Parser.string("right"))
     val parser = left.orElse(right)
@@ -74,7 +74,7 @@ class SuspendableSuite extends FunSuite {
     )
   }
 
-  test(".rep repeats until parser does not succeed") {
+  test("Suspendable.rep repeats until parser does not succeed") {
     val parser = Parser.char('a').unsuspendable.rep
     val input = "aaaa "
 
@@ -84,7 +84,7 @@ class SuspendableSuite extends FunSuite {
     )
   }
 
-  test(".rep accumulates results in correct order") {
+  test("Suspendable.rep accumulates results in correct order") {
     val parser = Parser.charWhere(_.isDigit).unsuspendable.rep
     val input = "1234 "
 
@@ -94,14 +94,14 @@ class SuspendableSuite extends FunSuite {
     )
   }
 
-  test(".rep fails if parser doesn't parse at least once") {
+  test("Suspendable.rep fails if parser doesn't parse at least once") {
     val parser = Parser.charWhere(_.isDigit).unsuspendable.rep
     val input = " "
 
     assertEquals(parser.parse(input), Resumable.epsilon(input, 0))
   }
 
-  test(".rep succeeds if parser parses at least once") {
+  test("Suspendable.rep succeeds if parser parses at least once") {
     val parser = Parser.charWhere(_.isDigit).unsuspendable.rep
     val input = "1 "
 

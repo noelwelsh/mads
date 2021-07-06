@@ -95,4 +95,14 @@ class ParserSuite extends FunSuite {
     assertEquals(lineEnd.parse(lf), Result.Success(lf, lf, 0, lf.size))
     assertEquals(p.parse(input), Result.Success((ws, lf), input, 0, input.size))
   }
+
+  test("Parser.end") {
+    val end = Parser.end
+    val whiteSpace = Parser.charsWhile(ch => ch == ' ' || ch == '\t')
+    val parser = whiteSpace <* end
+    val input = "    "
+
+    assertEquals(parser.parse(input), Result.Success(input, input, 0, input.size))
+    assertEquals(end.parse(input), Result.Epsilon(input, 0))
+  }
 }

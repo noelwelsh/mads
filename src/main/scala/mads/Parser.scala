@@ -61,14 +61,14 @@ enum Parser[A] {
   def orElse(that: Parser[A]): Parser[A] =
     OrElse(this, that)
 
+  def advance[S]: Suspendable[S, A] =
+    Suspendable.Advance(this)
+
   def resume(using
       semigroup: Semigroup[A],
       ev: String =:= A
   ): Suspendable[A, A] =
     Suspendable.Suspend(this, str => ev(str), semigroup)
-
-  def advance[S]: Suspendable[S, A] =
-    Suspendable.Advance(this)
 
   def resumeWith(f: String => A)(using
       semigroup: Semigroup[A]
@@ -131,6 +131,10 @@ enum Parser[A] {
         }
         if idx == -1 then Continue(input.substring(offset), input, offset)
         else Success(input.substring(offset, idx), input, offset, nextOffset)
+
+      case End() =>
+        if offset == input.size then Success("", input, offset, input.size)
+        else Epsilon(input, offset)
 
       case Exactly(s) =>
         if input.startsWith(s, offset) then
@@ -240,6 +244,7 @@ enum Parser[A] {
   case OneOf(parsers: List[Parser[A]]) extends Parser[A]
   case StringIn(strings: Iterable[String]) extends Parser[String]
   case Void(parser: Parser[A]) extends Parser[Unit]
+  case End() extends Parser[String]
 }
 object Parser {
 
@@ -269,6 +274,10 @@ object Parser {
     */
   def charsUntilTerminatorOrEnd(terminators: String*): Parser[String] =
     CharactersUntilTerminatorOrEnd(terminators)
+
+  /** Matches the end of the input */
+  val end: Parser[String] =
+    End()
 
   /** Parse in order */
   def oneOf[A](parsers: List[Parser[A]]): Parser[A] =
