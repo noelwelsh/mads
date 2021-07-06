@@ -22,11 +22,11 @@ class SuspendableSuite extends FunSuite {
   test("Parser.resume consumes all parseable input across suspension") {
     val parser = Parser.charsUntilTerminatorOrEnd("123").resume
     val result =
-      parser.parseToCompletion(List("abc ", "do ray me ", "you and me", "123"))
+      parser.parseToCompletion(List("abc ", "do ray me ", "you and me", " 123"))
 
     assertEquals(
       result,
-      Suspendable.Result.Success("abc do ray me you and me", "123", 0, 3)
+      Suspendable.Result.Success("abc do ray me you and me ", " 123", 0, 1)
     )
   }
 
