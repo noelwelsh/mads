@@ -3,6 +3,7 @@ package mads
 import cats.Semigroup
 import cats.data.Chain
 import cats.syntax.semigroup
+import scala.util.matching.Regex
 
 /** A parser that produces a value of type A.
   *
@@ -106,6 +107,12 @@ enum Parser[A] {
 
         loop(offset)
 
+      case CharactersUntilRegexOrEnd(regex) =>
+        val matcher = regex.pattern.matcher(input)
+        val found = matcher.find(offset)
+        if found then Success(input.substring(offset, matcher.start()), input, offset, matcher.start())
+        else Continue(input.substring(offset), input, offset)
+
       case CharactersUntilTerminator(ts) =>
         var idx = -1
         var nextOffset = -1
@@ -132,7 +139,7 @@ enum Parser[A] {
         if idx == -1 then Continue(input.substring(offset), input, offset)
         else Success(input.substring(offset, idx), input, offset, nextOffset)
 
-      case End() =>
+      case End =>
         if offset == input.size then Success("", input, offset, input.size)
         else Epsilon(input, offset)
 
@@ -237,6 +244,7 @@ enum Parser[A] {
       extends Parser[String]
   case CharactersUntilTerminatorOrEnd(terminators: Seq[String])
       extends Parser[String]
+  case CharactersUntilRegexOrEnd(regex: Regex) extends Parser[String]
   case Exactly(expected: String) extends Parser[String]
   case Product[A, B](left: Parser[A], right: Parser[B]) extends Parser[(A, B)]
   case Map[A, B](source: Parser[A], f: A => B) extends Parser[B]
@@ -244,7 +252,7 @@ enum Parser[A] {
   case OneOf(parsers: List[Parser[A]]) extends Parser[A]
   case StringIn(strings: Iterable[String]) extends Parser[String]
   case Void(parser: Parser[A]) extends Parser[Unit]
-  case End() extends Parser[String]
+  case End extends Parser[String]
 }
 object Parser {
 
@@ -265,6 +273,11 @@ object Parser {
   def charsUntil(predicate: Char => Boolean): Parser[String] =
     charsWhile(ch => !predicate(ch))
 
+  /** Parse zero or more characters until the first match of the regular
+   * expression or the end of the input */
+  def charsUntilRegexOrEnd(regex: Regex): Parser[String] =
+    CharactersUntilRegexOrEnd(regex)
+
   /** Parse until the first example of one of the terminators */
   def charsUntilTerminator(terminators: String*): Parser[String] =
     CharactersUntilTerminator(terminators)
@@ -277,7 +290,7 @@ object Parser {
 
   /** Matches the end of the input */
   val end: Parser[String] =
-    End()
+    End
 
   /** Parse in order */
   def oneOf[A](parsers: List[Parser[A]]): Parser[A] =

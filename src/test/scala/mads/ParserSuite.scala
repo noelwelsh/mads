@@ -30,6 +30,22 @@ class ParserSuite extends FunSuite {
     )
   }
 
+  test("Parser.charsUntilRegexOrEnd") {
+    val parser = Parser.charsUntilRegexOrEnd("1[2-4]+".r)
+
+    val endsInTerminator = "abcd13"
+    assertEquals(parser.parse(endsInTerminator), Result.Success("abcd", endsInTerminator, 0, 4))
+
+    val endsWithoutTerminator1 = "abcd"
+    assertEquals(parser.parse(endsWithoutTerminator1), Result.Continue(endsWithoutTerminator1, endsWithoutTerminator1, 0))
+
+    val endsWithoutTerminator2 = "abcd15"
+    assertEquals(parser.parse(endsWithoutTerminator2), Result.Continue(endsWithoutTerminator2, endsWithoutTerminator2, 0))
+
+    val endsAtFirstMatch = "abcd12ef12"
+    assertEquals(parser.parse(endsAtFirstMatch), Result.Success("abcd", endsAtFirstMatch, 0, 4))
+  }
+
   test("Parser.charsUntilTerminator") {
     assertEquals(
       Parser.charsUntilTerminator("abc").parse("123abc"),
