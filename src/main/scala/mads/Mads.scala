@@ -40,7 +40,8 @@ final case class Mads[A](repr: Representation[A])(using monoid: Monoid[A]) {
 
   val paragraph: Suspendable[A, A] = {
     Parser
-      .charsUntilTerminatorOrEnd("\n", "\r\n")
+      // A paragraph ends at a blank line or the end of the input
+      .charsUntilRegexOrEnd(raw"\v\w*\v".r)
       .map(repr.text)
       .resumeWith(repr.text)
       .map(repr.paragraph)
