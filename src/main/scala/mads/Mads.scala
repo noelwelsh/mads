@@ -25,10 +25,7 @@ final case class Mads[A](repr: Representation[A])(using monoid: Monoid[A]) {
       whiteSpace.advance[A] *> Parser
         .charsUntilTerminatorOrEnd("\n", "\r\n")
         .map(repr.text)
-        .resumeWith(repr.text) <* Parser0.charsThroughTerminatorOrEnd(
-        "\n",
-        "\r\n"
-      )
+        .resumeWith(repr.text)
 
     (level ~ content).map((l, c) =>
       l match {
