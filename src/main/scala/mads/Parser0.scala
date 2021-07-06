@@ -26,6 +26,12 @@ object Parser0 {
   def charsUntilRegexOrEnd(regex: Regex): Parser[String] =
     CharactersUntilRegexOrEnd(regex, true, false)
 
+  /** Parse zero or more characters through the first match of the regular
+    * expression or the end of the input
+    */
+  def charsThroughRegexOrEnd(regex: Regex): Parser[String] =
+    CharactersUntilRegexOrEnd(regex, true, true)
+
   /** Parse until the first example of one of the terminators */
   def charsUntilTerminator(terminators: String*): Parser[String] =
     CharactersUntilTerminator(terminators, true, false)
