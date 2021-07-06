@@ -86,6 +86,9 @@ class Parser0Suite extends FunSuite {
       parser.parse(endsImmediately),
       Result.Success(endsImmediately, endsImmediately, 0, 2)
     )
+
+    val empty = ""
+    assertEquals(parser.parse(empty), Result.Continue(empty, empty, 0))
   }
 
   test("Parser0.charsUntilTerminator") {
