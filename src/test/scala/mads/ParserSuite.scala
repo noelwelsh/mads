@@ -26,7 +26,7 @@ class ParserSuite extends FunSuite {
     )
     assertEquals(
       Parser.charsWhile(_.isDigit).parse("abc"),
-      Result.Success("", "abc", 0, 0)
+      Result.Epsilon("abc", 0)
     )
   }
 
@@ -44,24 +44,31 @@ class ParserSuite extends FunSuite {
 
     val endsAtFirstMatch = "abcd12ef12"
     assertEquals(parser.parse(endsAtFirstMatch), Result.Success("abcd", endsAtFirstMatch, 0, 4))
+
+    val endsImmediately = "12"
+    assertEquals(parser.parse(endsImmediately), Result.Epsilon(endsImmediately, 0))
   }
 
   test("Parser.charsUntilTerminator") {
     assertEquals(
       Parser.charsUntilTerminator("abc").parse("123abc"),
-      Result.Success("123", "123abc", 0, 6)
+      Result.Success("123", "123abc", 0, 3)
     )
     assertEquals(
       Parser.charsUntilTerminator("a", "bc").parse("123abc"),
-      Result.Success("123", "123abc", 0, 4)
+      Result.Success("123", "123abc", 0, 3)
     )
     assertEquals(
       Parser.charsUntilTerminator("a", "b").parse("123b"),
-      Result.Success("123", "123b", 0, 4)
+      Result.Success("123", "123b", 0, 3)
     )
     assertEquals(
       Parser.charsUntilTerminator("abc").parse("123"),
       Result.Committed("123", 0, 3)
+    )
+    assertEquals(
+      Parser.charsUntilTerminator("abc").parse("abc"),
+      Result.Epsilon("abc", 0)
     )
   }
 
@@ -72,19 +79,23 @@ class ParserSuite extends FunSuite {
     )
     assertEquals(
       Parser.charsUntilTerminatorOrEnd("\n").parse("123abc\n"),
-      Result.Success("123abc", "123abc\n", 0, 7)
+      Result.Success("123abc", "123abc\n", 0, 6)
     )
     assertEquals(
       Parser.charsUntilTerminatorOrEnd(">", "<").parse("123<"),
-      Result.Success("123", "123<", 0, 4)
+      Result.Success("123", "123<", 0, 3)
     )
     assertEquals(
       Parser.charsUntilTerminatorOrEnd(">", "<").parse("123>"),
-      Result.Success("123", "123>", 0, 4)
+      Result.Success("123", "123>", 0, 3)
     )
     assertEquals(
       Parser.charsUntilTerminatorOrEnd(">", "<").parse("123"),
       Result.Continue("123", "123", 0)
+    )
+    assertEquals(
+      Parser.charsUntilTerminatorOrEnd("abc").parse("abc"),
+      Result.Epsilon("abc", 0)
     )
   }
 
