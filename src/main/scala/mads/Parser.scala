@@ -98,22 +98,30 @@ enum Parser[A] {
           if p(ch) then Success(ch, input, offset, offset + 1)
           else Epsilon(input, offset)
 
-      case CharactersWhile(p) =>
+      case CharactersWhile(p, empty) =>
         def loop(idx: Int): Result[A] =
           if idx == input.size then
             Continue(input.substring(offset, idx), input, offset)
           else if p(input(idx)) then loop(idx + 1)
+          else if idx == offset then
+            if empty then Success(input.substring(offset, idx), input, offset, idx)
+            else Epsilon(input, offset)
           else Success(input.substring(offset, idx), input, offset, idx)
 
         loop(offset)
 
-      case CharactersUntilRegexOrEnd(regex) =>
+      case CharactersUntilRegexOrEnd(regex, empty) =>
         val matcher = regex.pattern.matcher(input)
         val found = matcher.find(offset)
-        if found then Success(input.substring(offset, matcher.start()), input, offset, matcher.start())
+        if found then
+          val idx = matcher.start()
+          if idx == offset then
+            if empty then Success(input.substring(offset, idx), input, offset, idx)
+            else Epsilon(input, offset)
+          else Success(input.substring(offset, matcher.start()), input, offset, matcher.start())
         else Continue(input.substring(offset), input, offset)
 
-      case CharactersUntilTerminator(ts) =>
+      case CharactersUntilTerminator(ts, empty) =>
         var idx = -1
         var nextOffset = -1
         ts.foreach { t =>
@@ -124,9 +132,12 @@ enum Parser[A] {
           ()
         }
         if idx == -1 then Committed(input, offset, input.size)
-        else Success(input.substring(offset, idx), input, offset, nextOffset)
+        else if idx == offset then
+          if empty then Success(input.substring(offset, idx), input, offset, idx)
+          else Epsilon(input, offset)
+        else Success(input.substring(offset, idx), input, offset, idx)
 
-      case CharactersUntilTerminatorOrEnd(ts) =>
+      case CharactersUntilTerminatorOrEnd(ts, empty) =>
         var idx = -1
         var nextOffset = -1
         ts.foreach { t =>
@@ -137,7 +148,10 @@ enum Parser[A] {
           ()
         }
         if idx == -1 then Continue(input.substring(offset), input, offset)
-        else Success(input.substring(offset, idx), input, offset, nextOffset)
+        else if idx == offset then
+          if empty then Success(input.substring(offset, idx), input, offset, idx)
+          else Epsilon(input, offset)
+        else Success(input.substring(offset, idx), input, offset, idx)
 
       case End =>
         if offset == input.size then Success("", input, offset, input.size)
@@ -239,12 +253,16 @@ enum Parser[A] {
 
   case Character(char: Char) extends Parser[Char]
   case CharacterWhere(predicate: Char => Boolean) extends Parser[Char]
-  case CharactersWhile(predicate: Char => Boolean) extends Parser[String]
-  case CharactersUntilTerminator(terminators: Seq[String])
+  // Empty is a flag that is true if an empty match should be considered a success instead of an epsilon failure
+  case CharactersWhile(predicate: Char => Boolean, empty: Boolean) extends Parser[String]
+  // Empty is a flag that is true if an empty match should be considered a success instead of an epsilon failure
+  case CharactersUntilTerminator(terminators: Seq[String], empty: Boolean)
       extends Parser[String]
-  case CharactersUntilTerminatorOrEnd(terminators: Seq[String])
+  // Empty is a flag that is true if an empty match should be considered a success instead of an epsilon failure
+  case CharactersUntilTerminatorOrEnd(terminators: Seq[String], empty: Boolean)
       extends Parser[String]
-  case CharactersUntilRegexOrEnd(regex: Regex) extends Parser[String]
+  // Empty is a flag that is true if an empty match should be considered a success instead of an epsilon failure
+  case CharactersUntilRegexOrEnd(regex: Regex, empty: Boolean) extends Parser[String]
   case Exactly(expected: String) extends Parser[String]
   case Product[A, B](left: Parser[A], right: Parser[B]) extends Parser[(A, B)]
   case Map[A, B](source: Parser[A], f: A => B) extends Parser[B]
@@ -264,10 +282,10 @@ object Parser {
   def charWhere(predicate: Char => Boolean): Parser[Char] =
     Parser.CharacterWhere(predicate)
 
-  /** Parses zero or more character until the predicate succeeds.
+  /** Parses zero or more character while predicate succeeds.
     */
   def charsWhile(predicate: Char => Boolean): Parser[String] =
-    Parser.CharactersWhile(predicate)
+    Parser.CharactersWhile(predicate, false)
 
   /** Parse zero or more characters until the predicate is true. */
   def charsUntil(predicate: Char => Boolean): Parser[String] =
@@ -276,17 +294,17 @@ object Parser {
   /** Parse zero or more characters until the first match of the regular
    * expression or the end of the input */
   def charsUntilRegexOrEnd(regex: Regex): Parser[String] =
-    CharactersUntilRegexOrEnd(regex)
+    CharactersUntilRegexOrEnd(regex, false)
 
   /** Parse until the first example of one of the terminators */
   def charsUntilTerminator(terminators: String*): Parser[String] =
-    CharactersUntilTerminator(terminators)
+    CharactersUntilTerminator(terminators, false)
 
   /** Parse until the first example of one of the terminators or the end of the
     * input
     */
   def charsUntilTerminatorOrEnd(terminators: String*): Parser[String] =
-    CharactersUntilTerminatorOrEnd(terminators)
+    CharactersUntilTerminatorOrEnd(terminators, false)
 
   /** Matches the end of the input */
   val end: Parser[String] =
