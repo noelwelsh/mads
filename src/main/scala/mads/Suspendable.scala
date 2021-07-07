@@ -158,14 +158,7 @@ enum Suspendable[S, A] {
           case Parser.Result.Committed(i, s, o) =>
             continuation(Committed(i, s, o))
           case Parser.Result.Epsilon(i, o) =>
-            if o == i.size then
-              Resumable.Suspended(
-                this,
-                lift(""),
-                semigroup,
-                continuation
-              )
-            else continuation(Epsilon(i, o))
+            continuation(Epsilon(i, o))
         }
 
       case Unsuspendable(parser) =>
