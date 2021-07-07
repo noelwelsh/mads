@@ -8,8 +8,6 @@ lazy val root = project
 
     scalaVersion := scala3Version,
 
-    scalacOptions ++= Seq("-Ykind-projector"),
-
     libraryDependencies ++= Seq(
       "org.typelevel" %% "cats-core" % "2.6.1",
       "org.scalameta" %% "munit" % "0.7.26" % Test,

@@ -57,6 +57,7 @@ enum Suspendable[S, A] {
     import Suspendable.Result.{Epsilon, Committed, Success}
 
     this match {
+
       case Backtrack(source) =>
         source.loop(
           input,
@@ -172,6 +173,9 @@ enum Suspendable[S, A] {
             continuation(Committed(i, s, o))
           case Parser.Result.Epsilon(i, o) => continuation(Epsilon(i, o))
         }
+
+      case _ =>
+        throw new IllegalStateException("This case should never happen. It's only here to stop exhaustivity checking from complaining.")
     }
   }
 
