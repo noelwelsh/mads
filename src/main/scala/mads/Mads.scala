@@ -9,6 +9,14 @@ final case class Mads[A](repr: Representation[A])(using monoid: Monoid[A]) {
   import Mads._
   import Suspendable._
 
+  object syntax {
+    extension (sc: StringContext) {
+      def md(args: Any*): A = {
+        parse(sc.parts, args).getOrExn
+      }
+    }
+  }
+
   val lineEnd: Parser[Unit] =
     Parser.string("\r\n").orElse(Parser.string("\n")).void
   val whiteSpace: Parser[Unit] =
@@ -22,7 +30,7 @@ final case class Mads[A](repr: Representation[A])(using monoid: Monoid[A]) {
       Parser.stringIn(List("#", "##", "###", "####", "#####", "######"))
 
     val content: Suspendable[A, A] =
-      whiteSpace.advance[A] *> Parser
+      whiteSpace.advance[A] *> Parser0
         .charsUntilTerminatorOrEnd("\n", "\r\n")
         .map(repr.text)
         .resumeWith(repr.text)
@@ -55,20 +63,21 @@ final case class Mads[A](repr: Representation[A])(using monoid: Monoid[A]) {
       .rep
       .map(_.combineAll)
 
-  def parse(parts: Array[String], args: Array[Any]): Resumable[A, A] = {
+  def parse(parts: Seq[String], args: Seq[Any]): Resumable[A, A] = {
     def loop(idx: Int, result: Resumable[A, A]): Resumable[A, A] =
       if idx >= parts.size then result
       else
+        val arg = args(idx - 1)
+        val part = parts(idx)
         val a = repr.argument(args(idx - 1))
-        val input = parts(idx)
-        loop(idx + 1, result.injectAndResumeOrRestart(a, input, parser))
+        loop(idx + 1, result.injectAndResumeOrRestart(a, part, parser))
 
-    assert(parts.size > 0)
-    assert(args.size == parts.size - 1)
+    assert(parts.size > 0, "Mads cannot parse this input. There were no string parts to parse. There must be at least one.")
+    assert(args.size == parts.size - 1, s"Mads cannot parse this input. There must be one less argument than string parts. There were ${parts.size} string parts and ${args.size} arguments")
 
     loop(1, parser.parse(parts(0)))
   }
 }
 object Mads {
-  val madsText = Mads(TextRepresentation)
+  val text = Mads(TextRepresentation)
 }
