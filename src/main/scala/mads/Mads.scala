@@ -19,9 +19,11 @@ final case class Mads[A](repr: Representation[A])(using monoid: Monoid[A]) {
 
   val lineEnd: Parser[Unit] =
     Parser.string("\r\n").orElse(Parser.string("\n")).void
-  val whiteSpace: Parser[Unit] =
+  val whiteSpace0: Parser[Unit] =
+    Parser0.charsWhile(ch => ch == ' ' || ch == '\t').void
+  val whiteSpace1: Parser[Unit] =
     Parser.charsWhile(ch => ch == ' ' || ch == '\t').void
-  val emptyLine: Parser[A] = (whiteSpace *> lineEnd).map(_ => monoid.empty)
+  val emptyLine: Parser[A] = (whiteSpace0 *> lineEnd).map(_ => monoid.empty)
 
   val hash = Parser.char('#')
 
@@ -30,7 +32,7 @@ final case class Mads[A](repr: Representation[A])(using monoid: Monoid[A]) {
       Parser.stringIn(List("#", "##", "###", "####", "#####", "######"))
 
     val content: Suspendable[A, A] =
-      whiteSpace.advance[A] *> Parser0
+      whiteSpace1.advance[A] *> Parser0
         .charsUntilTerminatorOrEnd("\n", "\r\n")
         .map(repr.text)
         .resumeWith(repr.text)
@@ -72,8 +74,14 @@ final case class Mads[A](repr: Representation[A])(using monoid: Monoid[A]) {
         val a = repr.argument(args(idx - 1))
         loop(idx + 1, result.injectAndResumeOrRestart(a, part, parser))
 
-    assert(parts.size > 0, "Mads cannot parse this input. There were no string parts to parse. There must be at least one.")
-    assert(args.size == parts.size - 1, s"Mads cannot parse this input. There must be one less argument than string parts. There were ${parts.size} string parts and ${args.size} arguments")
+    assert(
+      parts.size > 0,
+      "Mads cannot parse this input. There were no string parts to parse. There must be at least one."
+    )
+    assert(
+      args.size == parts.size - 1,
+      s"Mads cannot parse this input. There must be one less argument than string parts. There were ${parts.size} string parts and ${args.size} arguments"
+    )
 
     loop(1, parser.parse(parts(0)))
   }

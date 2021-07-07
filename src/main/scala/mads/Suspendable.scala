@@ -111,7 +111,7 @@ enum Suspendable[S, A] {
           if accum.offset == accum.input.size then continuation(accum)
           else
             r.source.loop(
-              input,
+              accum.input,
               accum.offset,
               Continuation((result: Result[a]) =>
                 result match {
@@ -185,18 +185,18 @@ enum Suspendable[S, A] {
   def parseToCompletion(
       input: IterableOnce[String],
       offset: Int = 0
-  ): Result[A] = {
+  )(using ev: S =:= A): Result[A] = {
     def loop(
         previousInput: String,
         input: Iterator[String],
         result: Resumable[S, A]
     ): Result[A] =
       result match {
-        case s @ Suspended(_, _, _, _) =>
+        case s @ Suspended(_, result, _, _) =>
           if input.hasNext then
             val nextInput = input.next()
             loop(nextInput, input, s.resume(nextInput))
-          else Committed(previousInput, 0, previousInput.size)
+          else Success(ev(result), previousInput, 0, previousInput.size)
         case Finished(r) => r
       }
 

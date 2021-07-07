@@ -34,11 +34,17 @@ enum Resumable[S, A] {
       case _ => None
     }
 
+  def getOrExn(using ev: S =:= A): A =
+    get(using ev) match {
+      case Some(a) => a
+      case None =>
+        throw new IllegalArgumentException("Could not parse the input.")
+    }
+
   def getIfFinished: Option[A] =
     this match {
       case Finished(Success(a, _, _, _)) => Some(a)
-      // case Finished(Continue(a, _, _))   => Some(a)
-      case _ => None
+      case _                             => None
     }
 
   def map[B](f: A => B): Resumable[S, B] =
@@ -46,9 +52,8 @@ enum Resumable[S, A] {
       case Suspended(p, s, semi, c) => Suspended(p, s, semi, c.map(f))
       case Finished(r) =>
         r match {
-          case Epsilon(i, s)      => epsilon(i, s)
-          case Committed(i, s, o) => committed(i, s, o)
-          // case Continue(a, i, s)   => continue(f(a), i, s)
+          case Epsilon(i, s)       => epsilon(i, s)
+          case Committed(i, s, o)  => committed(i, s, o)
           case Success(a, i, s, o) => success(f(a), i, s, o)
         }
     }
@@ -91,9 +96,6 @@ enum Resumable[S, A] {
         r match {
           case Epsilon(i, s)      => epsilon(i, s)
           case Committed(i, s, o) => committed(i, s, o)
-          // case Continue(a, i, s)   =>
-          //   val r1 = semigroup.combine(a, ev(result))
-          //   parser.parse(input).map(r2 => semigroup.combine(r1, r2))
           case Success(a, i, s, o) =>
             val r1 = semigroup.combine(a, ev(result))
             parser.parse(input).map(r2 => semigroup.combine(r1, r2))

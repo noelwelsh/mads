@@ -96,10 +96,13 @@ class MadsSuite extends FunSuite {
   }
 
   test("Document with h1, and p with arg") {
-    val input = List("""
+    val input = List(
+      """
     |# Just A Test
     |
-    |Let's test """.stripMargin, " works.")
+    |Let's test """.stripMargin,
+      " works."
+    )
 
     val args = List("Mads")
 
@@ -113,7 +116,8 @@ class MadsSuite extends FunSuite {
     val input = List("# Greetings ", "\n\nTake me to your ", ".")
     val args = List("Earthlings!", "readers")
 
-    val expected = "<h1>Greetings Earthlings!</h1><p>Take me to your readers.</p>"
+    val expected =
+      "<h1>Greetings Earthlings!</h1><p>Take me to your readers.</p>"
 
     val result = parse(input, args)
     assertEquals(result.get, Some(expected))
@@ -158,7 +162,8 @@ class MadsSuite extends FunSuite {
 This is $name
 and it's $emotion"""
 
-    val expected = s"<h1>Let's get $name</h1><p>This is $name\nand it's $emotion</p>"
+    val expected =
+      s"<h1>Let's Get $name</h1><p>This is $name\nand it's $emotion</p>"
     assertEquals(parsed, expected)
   }
 }

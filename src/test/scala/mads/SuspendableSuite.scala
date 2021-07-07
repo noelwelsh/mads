@@ -1,6 +1,7 @@
 package mads
 
 import cats.data._
+import cats.implicits.*
 import munit.FunSuite
 
 class SuspendableSuite extends FunSuite {
@@ -53,8 +54,8 @@ class SuspendableSuite extends FunSuite {
   }
 
   test("Suspendable.orElse succeeds if left succeeds") {
-    val left = Suspendable.fromParser(Parser.string("left"))
-    val right = Suspendable.fromParser(Parser.string("right"))
+    val left = Parser.string("left").unsuspendable[String]
+    val right = Parser.string("right").unsuspendable[String]
     val parser = left.orElse(right)
 
     assertEquals(
@@ -64,14 +65,33 @@ class SuspendableSuite extends FunSuite {
   }
 
   test("Suspendable.orElse succeeds if right succeeds") {
-    val left = Suspendable.fromParser(Parser.string("left"))
-    val right = Suspendable.fromParser(Parser.string("right"))
+    val left = Parser.string("left").unsuspendable[String]
+    val right = Parser.string("right").unsuspendable[String]
     val parser = left.orElse(right)
 
     assertEquals(
       parser.parseToCompletion(List("right")),
       Suspendable.Result.Success("right", "right", 0, 5)
     )
+  }
+
+  test("Suspendable.orElse succeeds if resumable left succeeds") {
+    val left = Parser.charsWhile(_.isDigit).resume
+    val right = Parser.charsWhile(_.isWhitespace).resume
+    val parser = left.orElse(right)
+
+    assertEquals(
+      parser.parseToCompletion(List("1234")),
+      Suspendable.Result.Success("1234", "1234", 0, 4)
+    )
+  }
+
+  test("Suspendable.orElse succeeds if resumable right succeeds") {
+    val left = Parser.charsWhile(_.isDigit).resume
+    val right = Parser.charsWhile(_.isWhitespace).resume
+    val parser = left.orElse(right)
+
+    assertEquals(parser.parse("   ").get, Some("   "))
   }
 
   test("Suspendable.rep repeats until parser does not succeed") {
@@ -109,5 +129,30 @@ class SuspendableSuite extends FunSuite {
       parser.parse(input),
       Resumable.success(NonEmptyChain('1'), input, 0, 1)
     )
+  }
+
+  test("Suspendable.rep parses across suspension") {
+    val parser = Parser.charsWhile(_.isDigit).resume.rep.map(_.combineAll)
+    val input = NonEmptyChain("1111", "2222", "3333")
+
+    val result = parser.parseToCompletion(input.toList)
+
+    assertEquals(
+      result,
+      Suspendable.Result.Success(input.combineAll, "3333", 0, 4)
+    )
+  }
+
+  test("Suspendable.rep and .orElse resumes across suspension") {
+    val p1 = Parser.charsWhile(_.isDigit)
+    val p2 = Parser.charsWhile(_.isSpaceChar)
+
+    val parser = p1.orElse(p2).resume.rep.map(_.combineAll)
+    val input = List("1111", "    ", "2222", "3333", "    ", "    ", "4444a")
+    val expected = "1111    22223333        4444"
+
+    val result = parser.parseToCompletion(input)
+
+    assertEquals(result, Suspendable.Result.Success(expected, "4444a", 0, 4))
   }
 }
