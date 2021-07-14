@@ -2,7 +2,8 @@ ThisBuild / name := "mads"
 ThisBuild / organization := "org.creativescala"
 ThisBuild / organizationName := "Noel Welsh"
 ThisBuild / organizationHomepage := Some(url("http://creativescala.org/"))
-ThisBuild / version := "0.1.0"
+ThisBuild / version := "0.2.0"
+ThisBuild / versionScheme := Some("early-semver")
 ThisBuild / isSnapshot := false
 
 ThisBuild / pgpSecretRing := pgpPublicRing.value

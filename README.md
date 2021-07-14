@@ -23,7 +23,7 @@ It's like MDX but not tied to Javascript and React.
 To use, add the following dependency to your `build.sbt`:
 
 ``` scala
-libraryDependencies += "org.creativescala" %% "mads" % "0.1.0"
+libraryDependencies += "org.creativescala" %% "mads" % "0.2.0"
 ```
 
 ### Supported Markdown
@@ -32,6 +32,7 @@ Mads does not currently support much of markdown. The following is implemented:
 
 - Headings in the sane ATX format (`# Heading`)
 - Paragraphs
+- Code blocks with backticks for fences. A language must be specified after the opening fence.
 
 More will be added as the need arises. It's unlikely it will ever support Setext
 headings.
