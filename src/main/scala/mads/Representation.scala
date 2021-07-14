@@ -13,3 +13,5 @@ trait Representation[A]:
   def argument(a: Any): A
 
   def text(text: String): A
+
+  def code(language: String, content: A): A

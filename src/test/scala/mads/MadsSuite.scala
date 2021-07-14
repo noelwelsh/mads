@@ -149,21 +149,28 @@ class MadsSuite extends FunSuite {
     assertEquals(result.get, Some(expected))
   }
 
-  test("md string interpolation") {
-    import mads.syntax._
+  test("code block") {
+    val input = List("```scala\nval mads = 42\n```")
+    val expected = """<pre><code class="language-scala">val mads = 42</code></pre>"""
 
-    val name = "Mads"
-    val emotion = "excited"
+    val result = parse(input)
+    assertEquals(result.get, Some(expected))
+  }
 
-    val parsed =
-      md"""
-# Let's Get $name
+  test("empty code block") {
+    val input = List("```scala\n\n```")
+    val expected = """<pre><code class="language-scala"></code></pre>"""
 
-This is $name
-and it's $emotion"""
+    val result = parse(input)
+    assertEquals(result.get, Some(expected))
+  }
 
-    val expected =
-      s"<h1>Let's Get $name</h1><p>This is $name\nand it's $emotion</p>"
-    assertEquals(parsed, expected)
+  test("code block with interpolation") {
+    val input = List("```scala\nval ", " = 42\n```")
+    val args = List("mads")
+    val expected = """<pre><code class="language-scala">val mads = 42</code></pre>"""
+
+    val result = parse(input, args)
+    assertEquals(result.get, Some(expected))
   }
 }

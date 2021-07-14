@@ -15,4 +15,7 @@ object TextRepresentation extends Representation[String] {
   def argument(a: Any): String = a.toString
 
   def text(text: String): String = text
+
+  def code(language: String, content: String) =
+    s"""<pre><code class="language-$language">$content</code></pre>"""
 }
