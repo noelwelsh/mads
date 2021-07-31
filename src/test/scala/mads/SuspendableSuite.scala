@@ -5,9 +5,9 @@ import cats.implicits.*
 import munit.FunSuite
 
 class SuspendableSuite extends FunSuite {
-  test("Parser.unsuspendable uses underlying parser") {
+  test("Parser.commit uses underlying parser") {
     assertEquals(
-      Parser.char('a').unsuspendable.parse("a"),
+      Parser.char('a').commit.parse("a"),
       Resumable.success('a', "a", 0, 1)
     )
   }
@@ -54,8 +54,8 @@ class SuspendableSuite extends FunSuite {
   }
 
   test("Suspendable.orElse succeeds if left succeeds") {
-    val left = Parser.string("left").unsuspendable[String]
-    val right = Parser.string("right").unsuspendable[String]
+    val left = Parser.string("left").commit[String]
+    val right = Parser.string("right").commit[String]
     val parser = left.orElse(right)
 
     assertEquals(
@@ -65,8 +65,8 @@ class SuspendableSuite extends FunSuite {
   }
 
   test("Suspendable.orElse succeeds if right succeeds") {
-    val left = Parser.string("left").unsuspendable[String]
-    val right = Parser.string("right").unsuspendable[String]
+    val left = Parser.string("left").commit[String]
+    val right = Parser.string("right").commit[String]
     val parser = left.orElse(right)
 
     assertEquals(
@@ -95,7 +95,7 @@ class SuspendableSuite extends FunSuite {
   }
 
   test("Suspendable.rep repeats until parser does not succeed") {
-    val parser = Parser.char('a').unsuspendable.rep
+    val parser = Parser.char('a').commit.rep
     val input = "aaaa "
 
     assertEquals(
@@ -105,7 +105,7 @@ class SuspendableSuite extends FunSuite {
   }
 
   test("Suspendable.rep accumulates results in correct order") {
-    val parser = Parser.charWhere(_.isDigit).unsuspendable.rep
+    val parser = Parser.charWhere(_.isDigit).commit.rep
     val input = "1234 "
 
     assertEquals(
@@ -115,14 +115,14 @@ class SuspendableSuite extends FunSuite {
   }
 
   test("Suspendable.rep fails if parser doesn't parse at least once") {
-    val parser = Parser.charWhere(_.isDigit).unsuspendable.rep
+    val parser = Parser.charWhere(_.isDigit).commit.rep
     val input = " "
 
     assertEquals(parser.parse(input), Resumable.epsilon(input, 0))
   }
 
   test("Suspendable.rep succeeds if parser parses at least once") {
-    val parser = Parser.charWhere(_.isDigit).unsuspendable.rep
+    val parser = Parser.charWhere(_.isDigit).commit.rep
     val input = "1 "
 
     assertEquals(

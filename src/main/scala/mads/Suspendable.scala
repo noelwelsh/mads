@@ -150,7 +150,7 @@ enum Suspendable[S, A] {
           case Parser.Result.Epsilon(i, o) => continuation(Epsilon(i, o))
         }
 
-      case Suspend(parser, lift, semigroup) =>
+      case Resume(parser, lift, semigroup) =>
         parser.parse(input, offset) match {
           case Parser.Result.Success(a, i, s, o) =>
             continuation(Success(a, i, s, o))
@@ -162,7 +162,7 @@ enum Suspendable[S, A] {
             continuation(Epsilon(i, o))
         }
 
-      case Unsuspendable(parser) =>
+      case Commit(parser) =>
         parser.parse(input, offset) match {
           case Parser.Result.Success(a, i, s, o) =>
             continuation(Success(a, i, s, o))
@@ -231,7 +231,7 @@ enum Suspendable[S, A] {
       extends Suspendable[S, NonEmptyChain[A]]
 
   /** Lift a Parser into a Suspendable parser allowing for resumption */
-  case Suspend[A](parser: Parser[A], lift: String => A, semigroup: Semigroup[A])
+  case Resume[A](parser: Parser[A], lift: String => A, semigroup: Semigroup[A])
       extends Suspendable[A, A]
 
   /** Lift a Parser into a Supspendable parser that will continue to next parser
@@ -240,11 +240,11 @@ enum Suspendable[S, A] {
   case Advance[S, A](parser: Parser[A]) extends Suspendable[S, A]
 
   /** Lift a Parser into a Suspendable parser without allowing for resumption */
-  case Unsuspendable[S, A](parser: Parser[A]) extends Suspendable[S, A]
+  case Commit[S, A](parser: Parser[A]) extends Suspendable[S, A]
 }
 object Suspendable {
   def fromParser[S, A](parser: Parser[A]): Suspendable[S, A] =
-    Suspendable.Unsuspendable(parser)
+    Suspendable.Commit(parser)
 
   enum Result[+A] {
 

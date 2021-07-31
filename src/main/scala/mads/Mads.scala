@@ -60,14 +60,14 @@ final case class Mads[A](repr: Representation[A])(using monoid: Monoid[A]) {
 
   val code: Suspendable[A, A] = {
     val start = Parser.string("```") *> Parser.charsUntilTerminator("\n", "\r\n") <* lineEnd
-    val content = Parser0.charsUntilRegexOrEnd(raw"\v```".r).map(repr.text).resumeWith(repr.text) <* lineEnd.unsuspendable
-    val stop = (Parser.string("```") ~ whiteSpace0 ~ lineEnd.orElse(Parser.end.void)).void.unsuspendable[A]
+    val content = Parser0.charsUntilRegexOrEnd(raw"\v```".r).map(repr.text).resumeWith(repr.text) <* lineEnd.commit
+    val stop = (Parser.string("```") ~ whiteSpace0 ~ lineEnd.orElse(Parser.end.void)).void.commit[A]
 
     (start ~ stop.map(_ => repr.text("")).orElse(content <* stop)).map((language, code) => repr.code(language, code))
   }
 
   val parser: Suspendable[A, A] =
-    emptyLine.unsuspendable.backtrack
+    emptyLine.commit.backtrack
       .orElse(heading.backtrack)
       .orElse(code.backtrack)
       .orElse(paragraph.backtrack)
