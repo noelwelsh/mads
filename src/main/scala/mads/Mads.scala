@@ -12,7 +12,10 @@ final case class Mads[A](repr: Representation[A])(using monoid: Monoid[A]) {
   object syntax {
     extension (sc: StringContext) {
       def md(args: Any*): A = {
-        parse(sc.parts, args).getOrExn
+        parse(sc.parts, args) match {
+          case Suspendable.Result.Success(a, _, _, _) => a
+          case other => throw new IllegalStateException("Mads could not parse input")
+        }
       }
     }
   }
@@ -74,9 +77,13 @@ final case class Mads[A](repr: Representation[A])(using monoid: Monoid[A]) {
       .rep
       .map(_.combineAll)
 
-  def parse(parts: Seq[String], args: Seq[Any]): Resumable[A, A] = {
-    def loop(idx: Int, result: Resumable[A, A]): Resumable[A, A] =
-      if idx >= parts.size then result
+  def parse(parts: Seq[String], args: Seq[Any]): Suspendable.Result[A] = {
+    def loop(idx: Int, result: Resumable[A, A]): Suspendable.Result[A] =
+      if idx == (parts.size-1) then
+        val arg = args(idx - 1)
+        val part = parts(idx)
+        val a = repr.argument(args(idx - 1))
+        result.injectAndCompleteOrRestart(a, part, parser)
       else
         val arg = args(idx - 1)
         val part = parts(idx)
@@ -92,7 +99,8 @@ final case class Mads[A](repr: Representation[A])(using monoid: Monoid[A]) {
       s"Mads cannot parse this input. There must be one less argument than string parts. There were ${parts.size} string parts and ${args.size} arguments"
     )
 
-    loop(1, parser.parse(parts(0)))
+    if(parts.size == 1) parser.complete(parts(0))
+    else loop(1, parser.parse(parts(0)))
   }
 }
 object Mads {

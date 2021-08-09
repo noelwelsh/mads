@@ -48,9 +48,9 @@ class SuspendableSuite extends FunSuite {
       .charsUntilTerminatorOrEnd("<")
       .resume
     val result =
-      parser.parse("    ").injectAndResumeOrRestart("inject", "", parser).get
+      parser.parse("    ").injectAndCompleteOrRestart("inject", "", parser).unsafeGet
 
-    assertEquals(result, Some("inject"))
+    assertEquals(result, "inject")
   }
 
   test("Suspendable.orElse succeeds if left succeeds") {
@@ -91,7 +91,7 @@ class SuspendableSuite extends FunSuite {
     val right = Parser.charsWhile(_.isWhitespace).resume
     val parser = left.orElse(right)
 
-    assertEquals(parser.parse("   ").get, Some("   "))
+    assertEquals(parser.complete("   ").unsafeGet, "   ")
   }
 
   test("Suspendable.rep repeats until parser does not succeed") {

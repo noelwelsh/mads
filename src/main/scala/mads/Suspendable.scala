@@ -4,6 +4,7 @@ import cats.Semigroup
 import cats.data.NonEmptyChain
 import cats.implicits._
 import mads.continuation.*
+import scala.annotation.nowarn
 
 /** A parser that can be suspended
   *
@@ -49,11 +50,64 @@ enum Suspendable[S, A] {
   def void: Suspendable[S, Unit] =
     this.map(_ => ())
 
+  /**
+   * Parse the given input under the assumption that no more input will be available.
+   */
+  def complete(input: String, offset: Int = 0): Result[A] =
+    loop(
+      input,
+      offset,
+      Continuation((ctrl: Control) => (r: Result[A]) => ctrl.lift(r))
+    )(Control.complete)
+
+  def parse(input: String, offset: Int = 0): Resumable[S, A] =
+    loop(
+      input,
+      offset,
+      Continuation((ctrl: Control) => r => ctrl.lift(r))
+    )(Control.suspend)
+
+  def parseToCompletion(
+      input: IterableOnce[String],
+      offset: Int = 0
+  )(using ev: S =:= A): Result[A] = {
+    def loop(
+      // Invariant: iterator should always have data available
+        iterator: Iterator[String],
+        result: Resumable[S, A]
+    ): Result[A] =
+      result match {
+        case s @ Suspended(_, result, _, _) =>
+          if iterator.hasNext then
+            val input = iterator.next()
+            if iterator.hasNext then loop(iterator, s.resume(input))
+            else s.complete(input)
+          else throw new IllegalStateException("parseToCompletion invariant did not hold. Input iterator did not have data available.")
+        case Finished(r) => r
+      }
+
+    val it = input.iterator
+    if it.hasNext then
+      val input = it.next()
+      if it.hasNext then loop(it, this.parse(input))
+      else this.complete(input)
+    else throw IllegalStateException("parseToCompleltion was given empty input. Cannot parse from no input.")
+  }
+
+  /** Parse the input string without suspending or failing in other ways or
+    * throw an exception. Mainly useful for tests or quick hacks.
+  def parseOrExn(input: String): A =
+    this.parse(input) match {
+      case Resumable.Finished(Success(a, _, _, _)) => a
+      case other => throw new Exception(s"Parsing failed with $other")
+    }
+    */
+
   def loop[B](
       input: String,
       offset: Int,
       continuation: Continuation[S, A, B]
-  ): Resumable[S, B] = {
+  )(ctrl: Control): ctrl.F[S, B] = {
     import Suspendable.Result.{Epsilon, Committed, Success}
 
     this match {
@@ -62,163 +116,94 @@ enum Suspendable[S, A] {
         source.loop(
           input,
           offset,
-          Continuation((result) =>
+          Continuation((ctrl: Control) => (result: Result[A]) =>
             result match {
-              case s @ Success(_, _, _, _) => continuation(s)
-              case Committed(i, s, _)      => continuation(Epsilon(i, s))
-              case e @ Epsilon(_, _)       => continuation(e)
+              case s @ Success(_, _, _, _) => continuation(s)(ctrl)
+              case Committed(i, s, _)      => continuation(Epsilon(i, s))(ctrl)
+              case e @ Epsilon(_, _)       => continuation(e)(ctrl)
             }
           )
-        )
+        )(ctrl)
 
       case Map(source, f) =>
         source.loop(
           input,
           offset,
           continuation.contramap(f)
-        )
+        )(ctrl)
 
       case OrElse(left, right) =>
         left.loop(
           input,
           offset,
-          Continuation(c =>
-            c match {
+          Continuation((ctrl: Control) => (result: Result[A]) =>
+            result match {
               case Epsilon(_, _) =>
-                right.loop(input, offset, continuation)
+                right.loop(input, offset, continuation)(ctrl)
               case other =>
-                continuation(other)
+                continuation(other)(ctrl)
             }
           )
-        )
+        )(ctrl)
 
       case p: Product[s, a, b] =>
         p.left.loop(
           input,
           offset,
-          Continuation((result: Result[a]) =>
+          Continuation((ctrl: Control) => (result: Result[a]) =>
             result match {
               case Success(a: a, i, s, o) =>
-                p.right.loop(i, o, continuation.contramap((b: b) => (a, b)))
-              case Committed(i, s, o) => continuation(Committed(i, s, o))
-              case Epsilon(i, o)      => continuation(Epsilon(i, o))
+                p.right.loop(i, o, continuation.contramap((b: b) => (a, b)))(ctrl)
+              case Committed(i, s, o) => continuation(Committed(i, s, o))(ctrl)
+              case Epsilon(i, o)      => continuation(Epsilon(i, o))(ctrl)
             }
           )
-        )
+        )(ctrl)
 
       case r: Rep[s, a] =>
-        def repeat(accum: Success[NonEmptyChain[a]]): Resumable[S, B] =
+        def repeat(accum: Success[NonEmptyChain[a]], ctrl: Control): ctrl.F[S, B] =
           // Don't allow infinite loops on parsers that don't make progress
-          if accum.offset == accum.input.size then continuation(accum)
+          if accum.offset == accum.input.size then continuation(accum)(ctrl)
           else
             r.source.loop(
               accum.input,
               accum.offset,
-              Continuation((result: Result[a]) =>
+              Continuation((ctrl: Control) => (result: Result[a]) =>
                 result match {
                   case Success(a, i, s, o) =>
-                    repeat(Success(accum.result :+ a, i, offset, o))
-                  case Committed(i, s, o) => continuation(accum)
-                  case Epsilon(i, o)      => continuation(accum)
+                    repeat(Success(accum.result :+ a, i, offset, o), ctrl)
+                  case Committed(i, s, o) => continuation(accum)(ctrl)
+                  case Epsilon(i, o)      => continuation(accum)(ctrl)
                 }
               )
-            )
+            )(ctrl)
 
         r.source.loop(
           input,
           offset,
-          Continuation((result: Result[a]) =>
+          Continuation((ctrl: Control) => (result: Result[a]) =>
             result match {
               case Success(a, i, s, o) =>
-                repeat(Success(NonEmptyChain(a), i, s, o))
-              case Committed(i, s, o) => continuation(Committed(i, s, o))
-              case Epsilon(i, o)      => continuation(Epsilon(i, o))
+                repeat(Success(NonEmptyChain(a), i, s, o), ctrl)
+              case Committed(i, s, o) => continuation(Committed(i, s, o))(ctrl)
+              case Epsilon(i, o)      => continuation(Epsilon(i, o))(ctrl)
             }
           )
-        )
+        )(ctrl)
 
       case Advance(parser) =>
-        parser.parse(input, offset) match {
-          case Parser.Result.Success(a, i, s, o) =>
-            continuation(Success(a, i, s, o))
-          // Advance converts Continue to Success and we move on to the next
-          // parser, which will usually Epsilon complete and be suspended.
-          case Parser.Result.Continue(a, i, s) =>
-            continuation(Success(a, i, s, i.size))
-          case Parser.Result.Committed(i, s, o) =>
-            continuation(Committed(i, s, o))
-          case Parser.Result.Epsilon(i, o) => continuation(Epsilon(i, o))
-        }
-
-      case Resume(parser, lift, semigroup) =>
-        parser.parse(input, offset) match {
-          case Parser.Result.Success(a, i, s, o) =>
-            continuation(Success(a, i, s, o))
-          case Parser.Result.Continue(a, i, s) =>
-            Resumable.Suspended(this, a, semigroup, continuation)
-          case Parser.Result.Committed(i, s, o) =>
-            continuation(Committed(i, s, o))
-          case Parser.Result.Epsilon(i, o) =>
-            continuation(Epsilon(i, o))
-        }
+        ctrl.advance(input, offset, parser, continuation)
 
       case Commit(parser) =>
-        parser.parse(input, offset) match {
-          case Parser.Result.Success(a, i, s, o) =>
-            continuation(Success(a, i, s, o))
-          // This parser is unsuspendable so we convert a continue into committed
-          case Parser.Result.Continue(a, i, s) =>
-            continuation(Committed(i, s, i.size))
-          case Parser.Result.Committed(i, s, o) =>
-            continuation(Committed(i, s, o))
-          case Parser.Result.Epsilon(i, o) => continuation(Epsilon(i, o))
-        }
+        ctrl.commit(input, offset, parser, continuation)
 
-      case _ =>
-        throw new IllegalStateException("This case should never happen. It's only here to stop exhaustivity checking from complaining.")
+      case Resume(parser, lift, semigroup) =>
+        ctrl.resume(input, offset, this, parser, lift, semigroup, continuation)
+
+      // case _ =>
+      //   throw new IllegalStateException("This case should never happen. It's only here to stop exhaustivity checking from complaining.")
     }
   }
-
-  def parse(input: String, offset: Int = 0): Resumable[S, A] =
-    loop(
-      input,
-      offset,
-      Continuation(c => Resumable.lift(c))
-    )
-
-  def parseToCompletion(
-      input: IterableOnce[String],
-      offset: Int = 0
-  )(using ev: S =:= A): Result[A] = {
-    def loop(
-        previousInput: String,
-        input: Iterator[String],
-        result: Resumable[S, A]
-    ): Result[A] =
-      result match {
-        case s @ Suspended(_, result, _, _) =>
-          if input.hasNext then
-            val nextInput = input.next()
-            loop(nextInput, input, s.resume(nextInput))
-          else Success(ev(result), previousInput, 0, previousInput.size)
-        case Finished(r) => r
-      }
-
-    val it = input.iterator
-    if it.hasNext then
-      val nextInput = it.next()
-      loop(nextInput, it, this.parse(nextInput))
-    else throw IllegalStateException("Cannot parse from no input.")
-  }
-
-  /** Parse the input string without suspending or failing in other ways or
-    * throw an exception. Mainly useful for tests or quick hacks.
-    */
-  def parseOrExn(input: String): A =
-    this.parse(input) match {
-      case Resumable.Finished(Success(a, _, _, _)) => a
-      case other => throw new Exception(s"Parsing failed with $other")
-    }
 
   case Backtrack[S, A](parser: Suspendable[S, A]) extends Suspendable[S, A]
   case Map[S, A, B](source: Suspendable[S, A], f: A => B)
@@ -230,10 +215,6 @@ enum Suspendable[S, A] {
   case Rep[S, A](source: Suspendable[S, A])
       extends Suspendable[S, NonEmptyChain[A]]
 
-  /** Lift a Parser into a Suspendable parser allowing for resumption */
-  case Resume[A](parser: Parser[A], lift: String => A, semigroup: Semigroup[A])
-      extends Suspendable[A, A]
-
   /** Lift a Parser into a Supspendable parser that will continue to next parser
     * when input ends
     */
@@ -241,12 +222,31 @@ enum Suspendable[S, A] {
 
   /** Lift a Parser into a Suspendable parser without allowing for resumption */
   case Commit[S, A](parser: Parser[A]) extends Suspendable[S, A]
+
+  /** Lift a Parser into a Suspendable parser allowing for resumption */
+  case Resume[A](parser: Parser[A], lift: String => A, semigroup: Semigroup[A])
+      extends Suspendable[A, A]
 }
 object Suspendable {
   def fromParser[S, A](parser: Parser[A]): Suspendable[S, A] =
     Suspendable.Commit(parser)
 
   enum Result[+A] {
+
+    def unsafeGet: A =
+      this match {
+        case Epsilon(_, _) => throw new IllegalStateException(s"This result was an epsilon failure, not a success: $this")
+        case Committed(_, _, _) => throw new IllegalStateException(s"This result was committed failure, not a success: $this")
+        case Success(a, _, _, _) => a
+      }
+
+    def map[B](f: A => B): Result[B] =
+      this match {
+        case Epsilon(i, o) => Epsilon(i, o)
+        case Committed(i, s, o) => Committed(i, s, o)
+        case Success(a, i, s, o) => Success(f(a), i, s, o)
+      }
+
 
     /** Parsed nothing starting at the given position in the input */
     case Epsilon(input: String, start: Int)

@@ -9,7 +9,7 @@ class MadsSuite extends FunSuite {
   def parse(
       input: List[String],
       args: List[String] = Nil
-  ): Resumable[String, String] =
+  ): Suspendable.Result[String] =
     mads.parse(input, args)
 
   test("h1 with newline") {
@@ -17,8 +17,8 @@ class MadsSuite extends FunSuite {
     val result = parse(input)
 
     assertEquals(
-      parse(input).get,
-      "<h1>Heading 1</h1>".some,
+      parse(input).unsafeGet,
+      "<h1>Heading 1</h1>",
       result
     )
   }
@@ -28,8 +28,8 @@ class MadsSuite extends FunSuite {
     val result = parse(input)
 
     assertEquals(
-      parse(input).get,
-      Some("<h1>Heading 1</h1>"),
+      parse(input).unsafeGet,
+     ("<h1>Heading 1</h1>"),
       result
     )
   }
@@ -40,7 +40,7 @@ class MadsSuite extends FunSuite {
 
     val result = parse(input, args)
 
-    assertEquals(result.get, Some("<h1>Heading 1</h1>"), result)
+    assertEquals(result.unsafeGet,("<h1>Heading 1</h1>"), result)
   }
 
   test("h1 with arg and no newline") {
@@ -49,14 +49,14 @@ class MadsSuite extends FunSuite {
 
     val result = parse(input, args)
 
-    assertEquals(result.get, Some("<h1>Heading 1</h1>"), result)
+    assertEquals(result.unsafeGet,("<h1>Heading 1</h1>"), result)
   }
 
   test("p") {
     val input = List("This is mad!\n")
 
     val result = parse(input)
-    assertEquals(result.get, Some("<p>This is mad!\n</p>"), result)
+    assertEquals(result.unsafeGet,("<p>This is mad!\n</p>"), result)
   }
 
   test("p with arg") {
@@ -64,7 +64,7 @@ class MadsSuite extends FunSuite {
     val args = List("Mads")
 
     val result = parse(input, args)
-    assertEquals(result.get, Some("<p>This is Mads!</p>"), result)
+    assertEquals(result.unsafeGet,("<p>This is Mads!</p>"), result)
   }
 
   test("p that spans multiple lines") {
@@ -75,8 +75,8 @@ class MadsSuite extends FunSuite {
 
     val result = parse(input)
     assertEquals(
-      result.get,
-      Some("<p>How much wood\nWould a woodchuck chuck?\n</p>"),
+      result.unsafeGet,
+     ("<p>How much wood\nWould a woodchuck chuck?\n</p>"),
       result
     )
   }
@@ -92,7 +92,7 @@ class MadsSuite extends FunSuite {
       "<h1>Just A Test</h1><p>Let's test this works.\n</p>".stripMargin
 
     val result = parse(input)
-    assertEquals(result.get, Some(expected))
+    assertEquals(result.unsafeGet,(expected))
   }
 
   test("Document with h1, and p with arg") {
@@ -109,7 +109,7 @@ class MadsSuite extends FunSuite {
     val expected = "<h1>Just A Test</h1><p>Let's test Mads works.</p>"
 
     val result = parse(input, args)
-    assertEquals(result.get, Some(expected))
+    assertEquals(result.unsafeGet,(expected))
   }
 
   test("Document with h1 with arg, and p") {
@@ -120,7 +120,7 @@ class MadsSuite extends FunSuite {
       "<h1>Greetings Earthlings!</h1><p>Take me to your readers.</p>"
 
     val result = parse(input, args)
-    assertEquals(result.get, Some(expected))
+    assertEquals(result.unsafeGet,(expected))
   }
 
   test("Document with p and two args") {
@@ -133,7 +133,7 @@ class MadsSuite extends FunSuite {
     val expected = s"<p>$greeting My name is $name</p>"
 
     val result = parse(input, args)
-    assertEquals(result.get, Some(expected))
+    assertEquals(result.unsafeGet,(expected))
   }
 
   test("Document with h1 and p and two args") {
@@ -146,7 +146,7 @@ class MadsSuite extends FunSuite {
     val expected = s"<h1>$greeting</h1><p>My name is $name</p>"
 
     val result = parse(input, args)
-    assertEquals(result.get, Some(expected))
+    assertEquals(result.unsafeGet,(expected))
   }
 
   test("code block") {
@@ -154,7 +154,7 @@ class MadsSuite extends FunSuite {
     val expected = """<pre><code class="language-scala">val mads = 42</code></pre>"""
 
     val result = parse(input)
-    assertEquals(result.get, Some(expected))
+    assertEquals(result.unsafeGet,(expected))
   }
 
   test("empty code block") {
@@ -162,7 +162,7 @@ class MadsSuite extends FunSuite {
     val expected = """<pre><code class="language-scala"></code></pre>"""
 
     val result = parse(input)
-    assertEquals(result.get, Some(expected))
+    assertEquals(result.unsafeGet,(expected))
   }
 
   test("code block with interpolation") {
@@ -171,6 +171,6 @@ class MadsSuite extends FunSuite {
     val expected = """<pre><code class="language-scala">val mads = 42</code></pre>"""
 
     val result = parse(input, args)
-    assertEquals(result.get, Some(expected))
+    assertEquals(result.unsafeGet,(expected))
   }
 }

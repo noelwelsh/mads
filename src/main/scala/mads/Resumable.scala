@@ -22,31 +22,6 @@ enum Resumable[S, A] {
   def isSuspension: Boolean =
     !isFinished
 
-  def get(using ev: S =:= A): Option[A] =
-    this match {
-      case Finished(Success(a, _, _, _)) => Some(a)
-      case Suspended(_, s, _, cont) =>
-        cont(Suspendable.Result.Success(s, "", 0, 0)) match {
-          case Finished(Success(a, _, _, _)) => Some(a)
-          case Suspended(_, s, _, _)         => Some(ev(s))
-          case _                             => None
-        }
-      case _ => None
-    }
-
-  def getOrExn(using ev: S =:= A): A =
-    get(using ev) match {
-      case Some(a) => a
-      case None =>
-        throw new IllegalArgumentException("Could not parse the input.")
-    }
-
-  def getIfFinished: Option[A] =
-    this match {
-      case Finished(Success(a, _, _, _)) => Some(a)
-      case _                             => None
-    }
-
   def map[B](f: A => B): Resumable[S, B] =
     this match {
       case Suspended(p, s, semi, c) => Suspended(p, s, semi, c.map(f))
@@ -56,6 +31,17 @@ enum Resumable[S, A] {
           case Committed(i, s, o)  => committed(i, s, o)
           case Success(a, i, s, o) => success(f(a), i, s, o)
         }
+    }
+
+  def complete(input: String): Suspendable.Result[A] =
+    this match {
+      case Suspended(p, r, semi, cont) =>
+        p.complete(input, 0) match {
+          case Success(r2, i, s, o) => cont(Success(semi.combine(r, r2), i, s, o))(Control.complete)
+          case other => cont(other)(Control.complete)
+        }
+
+      case Finished(r) => r
     }
 
   def inject(result: S): Resumable[S, A] =
@@ -76,9 +62,9 @@ enum Resumable[S, A] {
           case Finished(result) =>
             result match {
               case Success(r2, i, s, o) =>
-                cont(Success(semi.combine(r, r2), i, s, o))
+                cont(Success(semi.combine(r, r2), i, s, o))(Control.suspend.aux)
 
-              case other => cont(other)
+              case other => cont(other)(Control.suspend)
             }
         }
 
@@ -99,6 +85,23 @@ enum Resumable[S, A] {
           case Success(a, i, s, o) =>
             val r1 = semigroup.combine(a, ev(result))
             parser.parse(input).map(r2 => semigroup.combine(r1, r2))
+        }
+    }
+
+  def injectAndCompleteOrRestart(
+      result: S,
+      input: String,
+      parser: Suspendable[S, A]
+  )(using semigroup: Semigroup[A], ev: S =:= A): Suspendable.Result[A] =
+    this match {
+      case Suspended(_, _, _, _) => this.inject(result).complete(input)
+      case Finished(r) =>
+        r match {
+          case Epsilon(i, s)      => Epsilon(i, s)
+          case Committed(i, s, o) => Committed(i, s, o)
+          case Success(a, i, s, o) =>
+            val r1 = semigroup.combine(a, ev(result))
+            parser.complete(input).map(r2 => semigroup.combine(r1, r2))
         }
     }
 
