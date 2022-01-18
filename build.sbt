@@ -1,15 +1,26 @@
-val scala3Version = "3.0.1"
+val scala3Version = "3.1.0"
 
-lazy val root = project
-  .in(file("."))
-  .settings(
-    name := "mads",
+ThisBuild / name := "mads"
+ThisBuild / scalaVersion := scala3Version
+ThisBuild / version := "0.1.0"
+ThisBuild / versionScheme := Some("early-semver")
 
-    scalaVersion := scala3Version,
+ThisBuild / useSuperShell := false
 
-    libraryDependencies ++= Seq(
-      "org.typelevel" %% "cats-core" % "2.6.1",
-      "org.scalameta" %% "munit" % "0.7.26" % Test,
-      "com.novocode" % "junit-interface" % "0.11" % Test
-    )
-  )
+ThisBuild / scalafixDependencies += "com.github.liancheng" %% "organize-imports" % "0.5.0"
+ThisBuild / semanticdbEnabled := true
+ThisBuild / semanticdbVersion := scalafixSemanticdb.revision
+
+libraryDependencies ++= Seq(
+  "org.typelevel" %% "cats-core" % "2.7.0",
+  "org.scalameta" %% "munit" % "0.7.29" % Test
+)
+
+lazy val build = taskKey[Unit]("Build everything")
+build := {
+  dependencyUpdates.value
+  scalafmtAll.value
+  scalafixAll.toTask("").value
+  (Compile / compile).value
+  (Test / test).value
+}

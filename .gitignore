@@ -139,3 +139,7 @@ local.properties
 project/metals.sbt
 
 .sbt-hydra-history
+
+
+# VS Code
+.vscode

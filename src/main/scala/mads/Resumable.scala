@@ -37,7 +37,8 @@ enum Resumable[S, A] {
     this match {
       case Suspended(p, r, semi, cont) =>
         p.complete(input, 0) match {
-          case Success(r2, i, s, o) => cont(Success(semi.combine(r, r2), i, s, o))(Control.complete)
+          case Success(r2, i, s, o) =>
+            cont(Success(semi.combine(r, r2), i, s, o))(Control.complete)
           case other => cont(other)(Control.complete)
         }
 

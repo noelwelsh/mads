@@ -50,9 +50,9 @@ enum Suspendable[S, A] {
   def void: Suspendable[S, Unit] =
     this.map(_ => ())
 
-  /**
-   * Parse the given input under the assumption that no more input will be available.
-   */
+  /** Parse the given input under the assumption that no more input will be
+    * available.
+    */
   def complete(input: String, offset: Int = 0): Result[A] =
     loop(
       input,
@@ -72,7 +72,7 @@ enum Suspendable[S, A] {
       offset: Int = 0
   )(using ev: S =:= A): Result[A] = {
     def loop(
-      // Invariant: iterator should always have data available
+        // Invariant: iterator should always have data available
         iterator: Iterator[String],
         result: Resumable[S, A]
     ): Result[A] =
@@ -82,7 +82,10 @@ enum Suspendable[S, A] {
             val input = iterator.next()
             if iterator.hasNext then loop(iterator, s.resume(input))
             else s.complete(input)
-          else throw new IllegalStateException("parseToCompletion invariant did not hold. Input iterator did not have data available.")
+          else
+            throw new IllegalStateException(
+              "parseToCompletion invariant did not hold. Input iterator did not have data available."
+            )
         case Finished(r) => r
       }
 
@@ -91,16 +94,17 @@ enum Suspendable[S, A] {
       val input = it.next()
       if it.hasNext then loop(it, this.parse(input))
       else this.complete(input)
-    else throw IllegalStateException("parseToCompleltion was given empty input. Cannot parse from no input.")
+    else
+      throw IllegalStateException(
+        "parseToCompleltion was given empty input. Cannot parse from no input."
+      )
   }
 
   /** Parse the input string without suspending or failing in other ways or
-    * throw an exception. Mainly useful for tests or quick hacks.
-  def parseOrExn(input: String): A =
-    this.parse(input) match {
-      case Resumable.Finished(Success(a, _, _, _)) => a
-      case other => throw new Exception(s"Parsing failed with $other")
-    }
+    * throw an exception. Mainly useful for tests or quick hacks. def
+    * parseOrExn(input: String): A = this.parse(input) match { case
+    * Resumable.Finished(Success(a, _, _, _)) => a case other => throw new
+    * Exception(s"Parsing failed with $other") }
     */
 
   def loop[B](
@@ -116,12 +120,13 @@ enum Suspendable[S, A] {
         source.loop(
           input,
           offset,
-          Continuation((ctrl: Control) => (result: Result[A]) =>
-            result match {
-              case s @ Success(_, _, _, _) => continuation(s)(ctrl)
-              case Committed(i, s, _)      => continuation(Epsilon(i, s))(ctrl)
-              case e @ Epsilon(_, _)       => continuation(e)(ctrl)
-            }
+          Continuation((ctrl: Control) =>
+            (result: Result[A]) =>
+              result match {
+                case s @ Success(_, _, _, _) => continuation(s)(ctrl)
+                case Committed(i, s, _) => continuation(Epsilon(i, s))(ctrl)
+                case e @ Epsilon(_, _)  => continuation(e)(ctrl)
+              }
           )
         )(ctrl)
 
@@ -136,13 +141,14 @@ enum Suspendable[S, A] {
         left.loop(
           input,
           offset,
-          Continuation((ctrl: Control) => (result: Result[A]) =>
-            result match {
-              case Epsilon(_, _) =>
-                right.loop(input, offset, continuation)(ctrl)
-              case other =>
-                continuation(other)(ctrl)
-            }
+          Continuation((ctrl: Control) =>
+            (result: Result[A]) =>
+              result match {
+                case Epsilon(_, _) =>
+                  right.loop(input, offset, continuation)(ctrl)
+                case other =>
+                  continuation(other)(ctrl)
+              }
           )
         )(ctrl)
 
@@ -150,44 +156,54 @@ enum Suspendable[S, A] {
         p.left.loop(
           input,
           offset,
-          Continuation((ctrl: Control) => (result: Result[a]) =>
-            result match {
-              case Success(a: a, i, s, o) =>
-                p.right.loop(i, o, continuation.contramap((b: b) => (a, b)))(ctrl)
-              case Committed(i, s, o) => continuation(Committed(i, s, o))(ctrl)
-              case Epsilon(i, o)      => continuation(Epsilon(i, o))(ctrl)
-            }
+          Continuation((ctrl: Control) =>
+            (result: Result[a]) =>
+              result match {
+                case Success(a: a, i, s, o) =>
+                  p.right.loop(i, o, continuation.contramap((b: b) => (a, b)))(
+                    ctrl
+                  )
+                case Committed(i, s, o) =>
+                  continuation(Committed(i, s, o))(ctrl)
+                case Epsilon(i, o) => continuation(Epsilon(i, o))(ctrl)
+              }
           )
         )(ctrl)
 
       case r: Rep[s, a] =>
-        def repeat(accum: Success[NonEmptyChain[a]], ctrl: Control): ctrl.F[S, B] =
+        def repeat(
+            accum: Success[NonEmptyChain[a]],
+            ctrl: Control
+        ): ctrl.F[S, B] =
           // Don't allow infinite loops on parsers that don't make progress
           if accum.offset == accum.input.size then continuation(accum)(ctrl)
           else
             r.source.loop(
               accum.input,
               accum.offset,
-              Continuation((ctrl: Control) => (result: Result[a]) =>
-                result match {
-                  case Success(a, i, s, o) =>
-                    repeat(Success(accum.result :+ a, i, offset, o), ctrl)
-                  case Committed(i, s, o) => continuation(accum)(ctrl)
-                  case Epsilon(i, o)      => continuation(accum)(ctrl)
-                }
+              Continuation((ctrl: Control) =>
+                (result: Result[a]) =>
+                  result match {
+                    case Success(a, i, s, o) =>
+                      repeat(Success(accum.result :+ a, i, offset, o), ctrl)
+                    case Committed(i, s, o) => continuation(accum)(ctrl)
+                    case Epsilon(i, o)      => continuation(accum)(ctrl)
+                  }
               )
             )(ctrl)
 
         r.source.loop(
           input,
           offset,
-          Continuation((ctrl: Control) => (result: Result[a]) =>
-            result match {
-              case Success(a, i, s, o) =>
-                repeat(Success(NonEmptyChain(a), i, s, o), ctrl)
-              case Committed(i, s, o) => continuation(Committed(i, s, o))(ctrl)
-              case Epsilon(i, o)      => continuation(Epsilon(i, o))(ctrl)
-            }
+          Continuation((ctrl: Control) =>
+            (result: Result[a]) =>
+              result match {
+                case Success(a, i, s, o) =>
+                  repeat(Success(NonEmptyChain(a), i, s, o), ctrl)
+                case Committed(i, s, o) =>
+                  continuation(Committed(i, s, o))(ctrl)
+                case Epsilon(i, o) => continuation(Epsilon(i, o))(ctrl)
+              }
           )
         )(ctrl)
 
@@ -235,18 +251,23 @@ object Suspendable {
 
     def unsafeGet: A =
       this match {
-        case Epsilon(_, _) => throw new IllegalStateException(s"This result was an epsilon failure, not a success: $this")
-        case Committed(_, _, _) => throw new IllegalStateException(s"This result was committed failure, not a success: $this")
+        case Epsilon(_, _) =>
+          throw new IllegalStateException(
+            s"This result was an epsilon failure, not a success: $this"
+          )
+        case Committed(_, _, _) =>
+          throw new IllegalStateException(
+            s"This result was committed failure, not a success: $this"
+          )
         case Success(a, _, _, _) => a
       }
 
     def map[B](f: A => B): Result[B] =
       this match {
-        case Epsilon(i, o) => Epsilon(i, o)
-        case Committed(i, s, o) => Committed(i, s, o)
+        case Epsilon(i, o)       => Epsilon(i, o)
+        case Committed(i, s, o)  => Committed(i, s, o)
         case Success(a, i, s, o) => Success(f(a), i, s, o)
       }
-
 
     /** Parsed nothing starting at the given position in the input */
     case Epsilon(input: String, start: Int)

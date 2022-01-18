@@ -14,7 +14,8 @@ final case class Mads[A](repr: Representation[A])(using monoid: Monoid[A]) {
       def md(args: Any*): A = {
         parse(sc.parts, args) match {
           case Suspendable.Result.Success(a, _, _, _) => a
-          case other => throw new IllegalStateException("Mads could not parse input")
+          case other =>
+            throw new IllegalStateException("Mads could not parse input")
         }
       }
     }
@@ -60,13 +61,20 @@ final case class Mads[A](repr: Representation[A])(using monoid: Monoid[A]) {
       .resumeWith(repr.text)
       .map(repr.paragraph)
 
-
   val code: Suspendable[A, A] = {
-    val start = Parser.string("```") *> Parser.charsUntilTerminator("\n", "\r\n") <* lineEnd
-    val content = Parser0.charsUntilRegexOrEnd(raw"\v```".r).map(repr.text).resumeWith(repr.text) <* lineEnd.commit
-    val stop = (Parser.string("```") ~ whiteSpace0 ~ lineEnd.orElse(Parser.end.void)).void.commit[A]
+    val start = Parser
+      .string("```") *> Parser.charsUntilTerminator("\n", "\r\n") <* lineEnd
+    val content = Parser0
+      .charsUntilRegexOrEnd(raw"\v```".r)
+      .map(repr.text)
+      .resumeWith(repr.text) <* lineEnd.commit
+    val stop = (Parser.string("```") ~ whiteSpace0 ~ lineEnd.orElse(
+      Parser.end.void
+    )).void.commit[A]
 
-    (start ~ stop.map(_ => repr.text("")).orElse(content <* stop)).map((language, code) => repr.code(language, code))
+    (start ~ stop.map(_ => repr.text("")).orElse(content <* stop)).map(
+      (language, code) => repr.code(language, code)
+    )
   }
 
   val parser: Suspendable[A, A] =
@@ -79,7 +87,7 @@ final case class Mads[A](repr: Representation[A])(using monoid: Monoid[A]) {
 
   def parse(parts: Seq[String], args: Seq[Any]): Suspendable.Result[A] = {
     def loop(idx: Int, result: Resumable[A, A]): Suspendable.Result[A] =
-      if idx == (parts.size-1) then
+      if idx == (parts.size - 1) then
         val arg = args(idx - 1)
         val part = parts(idx)
         val a = repr.argument(args(idx - 1))
@@ -99,7 +107,7 @@ final case class Mads[A](repr: Representation[A])(using monoid: Monoid[A]) {
       s"Mads cannot parse this input. There must be one less argument than string parts. There were ${parts.size} string parts and ${args.size} arguments"
     )
 
-    if(parts.size == 1) parser.complete(parts(0))
+    if (parts.size == 1) parser.complete(parts(0))
     else loop(1, parser.parse(parts(0)))
   }
 }

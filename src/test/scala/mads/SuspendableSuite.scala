@@ -48,7 +48,10 @@ class SuspendableSuite extends FunSuite {
       .charsUntilTerminatorOrEnd("<")
       .resume
     val result =
-      parser.parse("    ").injectAndCompleteOrRestart("inject", "", parser).unsafeGet
+      parser
+        .parse("    ")
+        .injectAndCompleteOrRestart("inject", "", parser)
+        .unsafeGet
 
     assertEquals(result, "inject")
   }

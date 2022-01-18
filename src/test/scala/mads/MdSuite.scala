@@ -35,7 +35,8 @@ and it's $emotion"""
 val $name = $expr
 ```"""
 
-    val expected = """<pre><code class="language-scala">val mads = 42 * 42</code></pre>"""
+    val expected =
+      """<pre><code class="language-scala">val mads = 42 * 42</code></pre>"""
 
     assertEquals(parsed, expected)
   }
