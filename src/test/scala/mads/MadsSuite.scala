@@ -2,6 +2,7 @@ package mads
 
 import cats.implicits._
 import munit.FunSuite
+import repast.{Parser, Parser0, Resumable, Suspendable}
 
 class MadsSuite extends FunSuite {
   val mads = Mads.text

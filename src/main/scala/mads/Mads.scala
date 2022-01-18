@@ -4,6 +4,7 @@ import cats.{Monoid, Semigroup}
 import cats.data.Chain
 import cats.implicits._
 import cats.instances.string
+import repast.{Parser, Parser0, Resumable, Suspendable}
 
 final case class Mads[A](repr: Representation[A])(using monoid: Monoid[A]) {
   import Mads._

@@ -1,6 +1,7 @@
 val scala3Version = "3.1.0"
 
 ThisBuild / name := "mads"
+ThisBuild / organization := "com.noelwelsh"
 ThisBuild / scalaVersion := scala3Version
 ThisBuild / version := "0.1.0"
 ThisBuild / versionScheme := Some("early-semver")
@@ -12,6 +13,7 @@ ThisBuild / semanticdbEnabled := true
 ThisBuild / semanticdbVersion := scalafixSemanticdb.revision
 
 libraryDependencies ++= Seq(
+  "com.noelwelsh" %% "repast" % "0.1.0",
   "org.typelevel" %% "cats-core" % "2.7.0",
   "org.scalameta" %% "munit" % "0.7.29" % Test
 )
